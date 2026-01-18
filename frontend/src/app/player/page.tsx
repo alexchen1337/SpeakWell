@@ -26,6 +26,7 @@ export default function PlayerPage() {
   const [transcriptWords, setTranscriptWords] = useState<TranscriptWord[]>([]);
   const [transcriptStatus, setTranscriptStatus] = useState<'uploaded' | 'processing' | 'completed' | 'failed'>('uploaded');
   const [currentTime, setCurrentTime] = useState(0);
+  const [skeletonWidths, setSkeletonWidths] = useState<number[]>([]);
   const audioPlayerRef = useRef<AudioPlayerHandle>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -138,6 +139,13 @@ export default function PlayerPage() {
   };
 
   useEffect(() => {
+    // Generate skeleton widths only on client side to avoid hydration mismatch
+    if (typeof window !== 'undefined') {
+      setSkeletonWidths([1, 2, 3, 4, 5].map(() => 60 + Math.random() * 30));
+    }
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
@@ -164,7 +172,7 @@ export default function PlayerPage() {
             <div className="skeleton-line" style={{ height: '20px', width: '120px', marginBottom: '1rem' }}></div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} className="skeleton-line" style={{ height: '16px', width: `${60 + Math.random() * 30}%` }}></div>
+                <div key={i} className="skeleton-line" style={{ height: '16px', width: skeletonWidths[i - 1] ? `${skeletonWidths[i - 1]}%` : '75%' }}></div>
               ))}
             </div>
           </div>

@@ -95,16 +95,6 @@ export default function TranscriptView({
       <div className="transcript-header">
         <div className="transcript-header-left">
           <h3>Transcript</h3>
-          <div className="deception-legend">
-            <span className="legend-item">
-              <span className="legend-dot medium"></span>
-              Medium confidence
-            </span>
-            <span className="legend-item">
-              <span className="legend-dot high"></span>
-              High confidence
-            </span>
-          </div>
         </div>
         <button 
           className={`auto-scroll-btn ${autoScroll ? 'active' : ''}`}
@@ -126,9 +116,8 @@ export default function TranscriptView({
             <React.Fragment key={`${index}-${word.start}`}>
               <span
                 ref={index === activeWordIndex ? activeWordRef : null}
-                className={`transcript-word ${index === activeWordIndex ? 'active' : ''} ${index < activeWordIndex ? 'past' : ''} ${word.deceptionConfidence === 'medium' ? 'deception-medium' : ''} ${word.deceptionConfidence === 'high' ? 'deception-high' : ''}`}
+                className={`transcript-word ${index === activeWordIndex ? 'active' : ''} ${index < activeWordIndex ? 'past' : ''}`}
                 onClick={() => handleWordClick(word.start)}
-                title={word.deceptionConfidence ? `Confidence: ${word.deceptionConfidence}` : undefined}
               >
                 {word.word}
               </span>
