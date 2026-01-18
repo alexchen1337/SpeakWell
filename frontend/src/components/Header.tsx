@@ -52,8 +52,8 @@ export default function Header() {
         {isAuthenticated && (
           <nav className="header-nav">
             <button 
-              onClick={() => router.push('/')} 
-              className={`nav-link ${pathname === '/' ? 'active' : ''}`}
+              onClick={() => router.push('/library')} 
+              className={`nav-link ${pathname === '/library' ? 'active' : ''}`}
             >
               Library
             </button>

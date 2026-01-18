@@ -78,6 +78,22 @@ export const authService = {
     await axiosInstance.post('/auth/logout');
   },
 
+  updateName: async (name: string): Promise<{ message: string; name: string }> => {
+    currentUserCache = null;
+    const response = await axiosInstance.patch('/auth/me/name', { name });
+    return response.data;
+  },
+
+  login: async (email: string, password: string): Promise<void> => {
+    currentUserCache = null;
+    await axiosInstance.post('/auth/login', { email, password });
+  },
+
+  signup: async (email: string, password: string, name?: string): Promise<void> => {
+    currentUserCache = null;
+    await axiosInstance.post('/auth/signup', { email, password, name });
+  },
+
   clearCache: () => {
     currentUserCache = null;
   }

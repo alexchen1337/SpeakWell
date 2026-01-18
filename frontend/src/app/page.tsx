@@ -2,27 +2,15 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/contexts/AuthContext';
-import AudioUpload from '@/components/AudioUpload';
-import AudioList from '@/components/AudioList';
-import { AudioFile, UploadingFile } from '@/types/audio';
+import { AudioFile } from '@/types/audio';
 import { audioAPI } from '@/services/api';
 
 export default function Home() {
   const router = useRouter();
   const { isAuthenticated, loading } = useAuth();
   const [audioFiles, setAudioFiles] = useState<AudioFile[]>([]);
-  const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
   const [loadingFiles, setLoadingFiles] = useState(false);
-  const [deletingIds, setDeletingIds] = useState<string[]>([]);
-  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-
-  const showNotification = useCallback((type: 'success' | 'error', message: string) => {
-    setNotification({ type, message });
-    setTimeout(() => setNotification(null), 5000);
-  }, []);
 
   const loadAudioFiles = useCallback(async () => {
     try {
@@ -33,87 +21,11 @@ export default function Home() {
         uploadedAt: new Date(f.uploadedAt)
       })));
     } catch (error: any) {
-      showNotification('error', 'Failed to load audio files');
+      console.error('Failed to load audio files');
     } finally {
       setLoadingFiles(false);
     }
-  }, [showNotification]);
-
-  const handleFilesSelected = useCallback(async (files: File[]) => {
-    const newUploadingFiles: UploadingFile[] = files.map(file => ({
-      id: uuidv4(),
-      file,
-      progress: 0,
-      status: 'uploading' as const,
-    }));
-
-    setUploadingFiles(newUploadingFiles);
-    setIsUploading(true);
-
-    try {
-      const uploadedFiles = await audioAPI.uploadAudio(files, (fileIndex, progress) => {
-        setUploadingFiles(prev => prev.map((f, i) => 
-          i === fileIndex ? { ...f, progress } : f
-        ));
-      });
-
-      setUploadingFiles(prev => prev.map(f => ({ ...f, status: 'success' as const, progress: 100 })));
-      
-      const newAudioFiles = uploadedFiles.map(f => ({
-        ...f,
-        uploadedAt: new Date(f.uploadedAt)
-      }));
-      
-      setAudioFiles(prev => [...newAudioFiles, ...prev]);
-      showNotification('success', `Successfully uploaded ${files.length} file${files.length > 1 ? 's' : ''}`);
-
-      setTimeout(() => {
-        setUploadingFiles([]);
-      }, 2000);
-
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || error.message || 'Upload failed';
-      
-      setUploadingFiles(prev => prev.map(f => ({ 
-        ...f, 
-        status: 'error' as const, 
-        error: errorMessage 
-      })));
-
-      showNotification('error', errorMessage);
-
-      setTimeout(() => {
-        setUploadingFiles([]);
-      }, 5000);
-    } finally {
-      setIsUploading(false);
-    }
-  }, [showNotification]);
-
-  const handleSelectAudio = useCallback((audio: AudioFile) => {
-    localStorage.setItem('currentAudio', JSON.stringify({
-      id: audio.id,
-      title: audio.title,
-      duration: audio.duration,
-      size: audio.size,
-    }));
-    router.push('/player');
-  }, [router]);
-
-  const handleDeleteAudio = useCallback(async (id: string) => {
-    setDeletingIds(prev => [...prev, id]);
-    
-    try {
-      await audioAPI.deleteAudio(id);
-      setAudioFiles(prev => prev.filter(audio => audio.id !== id));
-      showNotification('success', 'Audio file deleted successfully');
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || 'Failed to delete audio file';
-      showNotification('error', errorMessage);
-    } finally {
-      setDeletingIds(prev => prev.filter(deletingId => deletingId !== id));
-    }
-  }, [showNotification]);
+  }, []);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -127,28 +39,45 @@ export default function Home() {
     }
   }, [isAuthenticated, loadAudioFiles]);
 
-  if (loading) {
+  if (loading || loadingFiles) {
     return (
-      <main className="app-container">
-        <div className="skeleton-header">
-          <div className="skeleton-line skeleton-title"></div>
-          <div className="skeleton-line skeleton-subtitle"></div>
+      <main className="home-dashboard">
+        <div className="dashboard-hero">
+          <div className="skeleton-line" style={{ height: '3.5rem', width: '450px', marginBottom: '1rem', maxWidth: '90%', margin: '0 auto 1rem' }}></div>
+          <div className="skeleton-line" style={{ height: '1.375rem', width: '320px', maxWidth: '80%', margin: '0 auto' }}></div>
         </div>
-        <div className="library-section">
-          <div className="list-controls">
-            <div className="skeleton-line" style={{ height: '38px', flex: 1 }}></div>
-            <div className="skeleton-line" style={{ height: '38px', width: '120px' }}></div>
-          </div>
-          <div className="list-items">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="audio-item-skeleton">
-                <div className="skeleton-line" style={{ width: '32px', height: '32px', borderRadius: '4px' }}></div>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  <div className="skeleton-line" style={{ height: '16px', width: '60%' }}></div>
-                  <div className="skeleton-line" style={{ height: '12px', width: '30%' }}></div>
+        <div className="dashboard-content">
+          <div className="dashboard-section">
+            <div className="section-header-dash">
+              <div className="skeleton-line" style={{ height: '1.75rem', width: '280px' }}></div>
+              <div className="skeleton-line" style={{ height: '38px', width: '100px', borderRadius: '2px' }}></div>
+            </div>
+            <div className="recent-files">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="recent-file-card" style={{ pointerEvents: 'none', cursor: 'default', background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border-default)' }}>
+                  <div className="skeleton-line" style={{ width: '48px', height: '48px', borderRadius: '4px', flexShrink: 0 }}></div>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: 0 }}>
+                    <div className="skeleton-line" style={{ height: '1rem', width: '65%' }}></div>
+                    <div className="skeleton-line" style={{ height: '0.875rem', width: '35%' }}></div>
+                  </div>
+                  <div className="skeleton-line" style={{ width: '20px', height: '20px', flexShrink: 0 }}></div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+          <div className="dashboard-section">
+            <div className="section-header-dash">
+              <div className="skeleton-line" style={{ height: '1.75rem', width: '180px' }}></div>
+            </div>
+            <div className="quick-actions">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="action-card" style={{ pointerEvents: 'none', cursor: 'default', background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border-default)' }}>
+                  <div className="skeleton-line" style={{ width: '56px', height: '56px', borderRadius: '4px', marginBottom: '1rem' }}></div>
+                  <div className="skeleton-line" style={{ height: '1.125rem', width: '70%', marginBottom: '1rem' }}></div>
+                  <div className="skeleton-line" style={{ height: '0.9375rem', width: '90%' }}></div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </main>
@@ -159,59 +88,100 @@ export default function Home() {
     return null;
   }
 
+  const recentFiles = audioFiles.slice(0, 3);
+
   return (
-    <main className="app-container">
-      {notification && (
-        <div className={`notification ${notification.type}`}>
-          <span>{notification.message}</span>
-          <button onClick={() => setNotification(null)} className="notification-close">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-      )}
-
-      <header className="app-header">
-        <h1>Audio Library</h1>
-        <p>Upload, manage, and analyze your audio files</p>
-      </header>
-
-      <AudioUpload 
-        onFilesSelected={handleFilesSelected}
-        uploadingFiles={uploadingFiles}
-        isUploading={isUploading}
-      />
-
-      <div className="library-section">
-        {loadingFiles ? (
-          <>
-            <div className="list-controls">
-              <div className="skeleton-line" style={{ height: '38px', flex: 1 }}></div>
-              <div className="skeleton-line" style={{ height: '38px', width: '120px' }}></div>
+    <main className="home-dashboard">
+      <div className="dashboard-hero">
+        <h1>Welcome to SpeakWell</h1>
+        <p>Grade your Presentations</p>
+      </div>
+      <div className="dashboard-content">
+        <div className="dashboard-section">
+          <div className="section-header-dash">
+            <h2>Recent Presentations</h2>
+            <button onClick={() => router.push('/library')} className="view-all-btn">
+              View All
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+          {recentFiles.length === 0 ? (
+            <div className="empty-recent">
+              <p>No presentations yet</p>
+              <span>Upload a file to see it listed here.</span>
             </div>
-            <div className="list-items">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="audio-item-skeleton">
-                  <div className="skeleton-line" style={{ width: '32px', height: '32px', borderRadius: '4px' }}></div>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <div className="skeleton-line" style={{ height: '16px', width: '60%' }}></div>
-                    <div className="skeleton-line" style={{ height: '12px', width: '30%' }}></div>
+          ) : (
+            <div className="recent-files">
+              {recentFiles.map((file) => (
+                <div
+                  key={file.id}
+                  className="recent-file-card"
+                  onClick={() => {
+                    localStorage.setItem('currentAudio', JSON.stringify({
+                      id: file.id,
+                      title: file.title,
+                      duration: file.duration,
+                      size: file.size,
+                    }));
+                    router.push('/player');
+                  }}
+                >
+                  <div className="recent-file-icon">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                    </svg>
                   </div>
+                  <div className="recent-file-info">
+                    <h4>{file.title}</h4>
+                    <p>{(file.size / (1024 * 1024)).toFixed(1)} MB</p>
+                  </div>
+                  <svg className="chevron-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
                 </div>
               ))}
             </div>
-          </>
-        ) : (
-          <AudioList
-            audioFiles={audioFiles}
-            selectedAudioId={null}
-            onSelectAudio={handleSelectAudio}
-            onDeleteAudio={handleDeleteAudio}
-            deletingIds={deletingIds}
-          />
-        )}
+          )}
+        </div>
+
+        <div className="dashboard-section">
+          <div className="section-header-dash">
+            <h2>Quick Actions</h2>
+          </div>
+          <div className="quick-actions">
+            <button onClick={() => router.push('/library')} className="action-card">
+              <div className="action-icon">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+                </svg>
+              </div>
+              <h3>Upload Presentation</h3>
+              <p>Add a new audio file for analysis</p>
+            </button>
+
+            <button onClick={() => router.push('/library')} className="action-card">
+              <div className="action-icon">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+                </svg>
+              </div>
+              <h3>View Presentations</h3>
+              <p>Browse and manage all your files</p>
+            </button>
+
+            <button onClick={() => router.push('/search')} className="action-card">
+              <div className="action-icon">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <h3>Search Transcripts</h3>
+              <p>Find content across all files</p>
+            </button>
+          </div>
+        </div>
       </div>
     </main>
   );

@@ -384,6 +384,35 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
     }
 
 
+class UpdateNameRequest(BaseModel):
+    name: str
+    
+    @validator('name')
+    def validate_name(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Name cannot be empty")
+        v = v.strip()
+        if len(v) > 100:
+            raise ValueError("Name is too long")
+        return v
+
+
+@router.patch("/me/name")
+async def update_user_name(
+    request: UpdateNameRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    current_user.name = request.name
+    db.commit()
+    db.refresh(current_user)
+    
+    return {
+        "message": "Name updated successfully",
+        "name": current_user.name
+    }
+
+
 @router.post("/refresh")
 async def refresh_access_token(
     response: Response,

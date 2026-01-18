@@ -90,41 +90,54 @@ export default function TranscriptView({
     );
   }
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const currentWord = activeWordIndex >= 0 ? words[activeWordIndex] : null;
+
   return (
-    <div className="transcript-container">
-      <div className="transcript-header">
-        <div className="transcript-header-left">
-          <h3>Transcript</h3>
+    <div className="transcript-container-new">
+      <div className="transcript-controls">
+        <div className="transcript-info">
+          <span className="word-count">{words.length} words</span>
+          {currentWord && (
+            <span className="current-time">{formatTime(currentWord.start)}</span>
+          )}
         </div>
         <button 
-          className={`auto-scroll-btn ${autoScroll ? 'active' : ''}`}
+          className={`auto-scroll-toggle ${autoScroll ? 'active' : ''}`}
           onClick={() => setAutoScroll(!autoScroll)}
-          title={autoScroll ? 'Auto-scroll enabled' : 'Auto-scroll disabled'}
+          title={autoScroll ? 'Disable auto-scroll' : 'Enable auto-scroll'}
         >
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
           </svg>
+          {autoScroll ? 'Auto-scroll On' : 'Auto-scroll Off'}
         </button>
       </div>
       <div 
         ref={containerRef} 
-        className="transcript-content"
+        className="transcript-content-new"
         onScroll={handleScroll}
       >
-        <p className="transcript-text">
+        <div className="transcript-text-new">
           {words.map((word, index) => (
             <React.Fragment key={`${index}-${word.start}`}>
               <span
                 ref={index === activeWordIndex ? activeWordRef : null}
-                className={`transcript-word ${index === activeWordIndex ? 'active' : ''} ${index < activeWordIndex ? 'past' : ''}`}
+                className={`transcript-word-new ${index === activeWordIndex ? 'active' : ''} ${index < activeWordIndex ? 'past' : ''}`}
                 onClick={() => handleWordClick(word.start)}
+                data-time={formatTime(word.start)}
               >
                 {word.word}
               </span>
               {index < words.length - 1 && ' '}
             </React.Fragment>
           ))}
-        </p>
+        </div>
       </div>
     </div>
   );

@@ -20,6 +20,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   refreshAuth: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -73,6 +74,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await checkAuth();
   };
 
+  const refreshUser = async () => {
+    authService.clearCache();
+    await checkAuth();
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -82,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         isAuthenticated: !!user,
         refreshAuth,
+        refreshUser,
       }}
     >
       {children}

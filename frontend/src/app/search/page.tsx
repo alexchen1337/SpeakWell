@@ -52,7 +52,11 @@ export default function SearchPage() {
   }, [isAuthenticated, loadAudioFiles]);
 
   const performSearch = async () => {
-    if (!searchQuery.trim()) return;
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setHasSearched(false);
+      return;
+    }
 
     setSearching(true);
     setHasSearched(true);
@@ -163,7 +167,14 @@ export default function SearchPage() {
             type="text"
             placeholder="Search across all transcripts..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              const newValue = e.target.value;
+              setSearchQuery(newValue);
+              if (!newValue.trim()) {
+                setSearchResults([]);
+                setHasSearched(false);
+              }
+            }}
             className="search-input-main"
             autoFocus
           />
