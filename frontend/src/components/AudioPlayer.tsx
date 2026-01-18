@@ -65,7 +65,9 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({ audio, on
     const handleSeekClick = () => {
       setTimeout(() => {
         if (wavesurferRef.current) {
-          setCurrentTime(wavesurferRef.current.getCurrentTime());
+          const time = wavesurferRef.current.getCurrentTime();
+          setCurrentTime(time);
+          onTimeUpdate?.(time);
         }
       }, 10);
     };
@@ -94,7 +96,7 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({ audio, on
         // ignore cleanup errors
       }
     };
-  }, []);
+  }, [onTimeUpdate]);
 
   useEffect(() => {
     if (wavesurferRef.current && audio && audio.url) {

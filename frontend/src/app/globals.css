@@ -1420,10 +1420,11 @@ input, select, textarea {
 
 /* New Player Page Styles */
 .player-container {
-  min-height: calc(100vh - 64px);
+  height: calc(100vh - 64px);
   display: flex;
   flex-direction: column;
   animation: fadeIn var(--transition-page) ease-in-out;
+  overflow: hidden;
 }
 
 .player-header-bar {
@@ -1432,6 +1433,7 @@ input, select, textarea {
   padding: 1.5rem 2rem;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 2rem;
 }
 
@@ -1503,6 +1505,7 @@ input, select, textarea {
   grid-template-columns: 1fr 1fr;
   gap: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .player-panel,
@@ -1522,6 +1525,8 @@ input, select, textarea {
   padding: 1.5rem;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .player-section-header,
@@ -1529,9 +1534,10 @@ input, select, textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid var(--color-border-default);
+  flex-shrink: 0;
 }
 
 .player-section-header h2,
