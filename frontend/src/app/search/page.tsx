@@ -60,17 +60,16 @@ export default function SearchPage() {
 
     setSearching(true);
     setHasSearched(true);
-    const results: SearchResult[] = [];
 
     const completedFiles = audioFiles.filter(f => f.status === 'completed');
+    const query = searchQuery.toLowerCase();
 
-    for (const file of completedFiles) {
+    const searchFile = async (file: AudioFile): Promise<SearchResult | null> => {
       try {
         const response = await transcriptAPI.getTranscript(file.id);
-        
+
         if (response.status === 'completed' && response.transcript) {
           const words = response.transcript.words;
-          const query = searchQuery.toLowerCase();
           const matches: Array<{ text: string; startTime: number }> = [];
 
           for (let i = 0; i < words.length; i++) {
@@ -91,20 +90,24 @@ export default function SearchPage() {
           }
 
           if (matches.length > 0) {
-            results.push({
+            return {
               audioId: file.id,
               audioTitle: file.title,
               audioUrl: file.url,
               audioDuration: file.duration,
               audioSize: file.size,
               matches: matches.slice(0, 3)
-            });
+            };
           }
         }
       } catch {
         // skip files with errors
       }
-    }
+      return null;
+    };
+
+    const searchResults = await Promise.all(completedFiles.map(searchFile));
+    const results = searchResults.filter((r): r is SearchResult => r !== null);
 
     setSearchResults(results);
     setSearching(false);

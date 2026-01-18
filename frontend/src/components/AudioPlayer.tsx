@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
-import WaveSurfer from 'wavesurfer.js';
+import type WaveSurfer from 'wavesurfer.js';
 import { useRouter } from 'next/navigation';
 
 interface AudioPlayerProps {
@@ -24,84 +24,106 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({ audio, on
   const router = useRouter();
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
+  const onTimeUpdateRef = useRef(onTimeUpdate);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.7);
   const [error, setError] = useState<string | null>(null);
+  const [waveformReady, setWaveformReady] = useState(false);
+
+  useEffect(() => {
+    onTimeUpdateRef.current = onTimeUpdate;
+  }, [onTimeUpdate]);
 
   useEffect(() => {
     if (!waveformRef.current) return;
 
-    const ws = WaveSurfer.create({
-      container: waveformRef.current,
-      waveColor: 'rgba(153, 153, 153, 0.2)',
-      progressColor: '#2563eb',
-      cursorColor: '#2563eb',
-      barWidth: 2,
-      barRadius: 1,
-      cursorWidth: 1,
-      height: 80,
-      barGap: 2,
-      interact: true,
-      hideScrollbar: true,
-    });
-
-    wavesurferRef.current = ws;
-
-    ws.on('ready', () => {
-      setDuration(ws.getDuration());
-      ws.setVolume(0.7);
-      setError(null);
-    });
-
-    ws.on('audioprocess', () => {
-      const time = ws.getCurrentTime();
-      setCurrentTime(time);
-      onTimeUpdate?.(time);
-    });
-
+    let ws: WaveSurfer | null = null;
+    let cancelled = false;
     const container = waveformRef.current;
-    const handleSeekClick = () => {
-      setTimeout(() => {
-        if (wavesurferRef.current) {
-          const time = wavesurferRef.current.getCurrentTime();
-          setCurrentTime(time);
-          onTimeUpdate?.(time);
+
+    const initWaveSurfer = async () => {
+      const WaveSurferModule = await import('wavesurfer.js');
+      const WaveSurfer = WaveSurferModule.default;
+
+      if (cancelled || !container) return;
+
+      ws = WaveSurfer.create({
+        container,
+        waveColor: 'rgba(153, 153, 153, 0.2)',
+        progressColor: '#2563eb',
+        cursorColor: '#2563eb',
+        barWidth: 2,
+        barRadius: 1,
+        cursorWidth: 1,
+        height: 80,
+        barGap: 2,
+        interact: true,
+        hideScrollbar: true,
+      });
+
+      wavesurferRef.current = ws;
+      setWaveformReady(true);
+
+      ws.on('ready', () => {
+        setDuration(ws!.getDuration());
+        ws!.setVolume(0.7);
+        setError(null);
+      });
+
+      ws.on('audioprocess', () => {
+        const time = ws!.getCurrentTime();
+        setCurrentTime(time);
+        onTimeUpdateRef.current?.(time);
+      });
+
+      const handleSeekClick = () => {
+        setTimeout(() => {
+          if (wavesurferRef.current) {
+            const time = wavesurferRef.current.getCurrentTime();
+            setCurrentTime(time);
+            onTimeUpdateRef.current?.(time);
+          }
+        }, 10);
+      };
+
+      container.addEventListener('click', handleSeekClick);
+
+      ws.on('play', () => setIsPlaying(true));
+      ws.on('pause', () => setIsPlaying(false));
+      ws.on('finish', () => setIsPlaying(false));
+
+      ws.on('error', (error) => {
+        if (error.name !== 'AbortError') {
+          setError('Failed to load audio file. The file may be missing or corrupted.');
         }
-      }, 10);
+      });
     };
 
-    container.addEventListener('click', handleSeekClick);
-
-    ws.on('play', () => setIsPlaying(true));
-    ws.on('pause', () => setIsPlaying(false));
-    ws.on('finish', () => setIsPlaying(false));
-
-    ws.on('error', (error) => {
-      if (error.name !== 'AbortError') {
-        setError('Failed to load audio file. The file may be missing or corrupted.');
-      }
-    });
+    initWaveSurfer();
 
     return () => {
-      container.removeEventListener('click', handleSeekClick);
-      
-      try {
-        if (ws.isPlaying()) {
-          ws.pause();
+      cancelled = true;
+      if (ws) {
+        try {
+          if (ws.isPlaying()) {
+            ws.pause();
+          }
+          ws.destroy();
+        } catch (e) {
+          // ignore cleanup errors
         }
-        ws.destroy();
-      } catch (e) {
-        // ignore cleanup errors
       }
     };
-  }, [onTimeUpdate]);
+  }, []);
 
   useEffect(() => {
+    if (!waveformReady) return;
+
     if (wavesurferRef.current && audio && audio.url) {
       setError(null);
-      
+
       wavesurferRef.current.load(audio.url).catch((err) => {
         if (err.name !== 'AbortError') {
           setError('Failed to load audio file. The file may be missing or corrupted.');
@@ -112,7 +134,7 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({ audio, on
     } else if (audio && !audio.url) {
       setError('Audio URL is not available. Please try refreshing the page.');
     }
-  }, [audio]);
+  }, [audio, waveformReady]);
 
   useEffect(() => {
     if (wavesurferRef.current) {
@@ -127,14 +149,14 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({ audio, on
         if (duration > 0) {
           wavesurferRef.current.seekTo(time / duration);
           setCurrentTime(time);
-          onTimeUpdate?.(time);
+          onTimeUpdateRef.current?.(time);
         }
       }
     },
     getCurrentTime: () => {
       return wavesurferRef.current?.getCurrentTime() ?? 0;
     }
-  }), [onTimeUpdate]);
+  }), []);
 
   const togglePlayPause = () => {
     if (wavesurferRef.current) {

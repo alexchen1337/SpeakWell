@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { authService } from '@/services/auth';
 
@@ -54,11 +54,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [pathname]);
 
-  const login = () => {
+  const login = useCallback(() => {
     router.push('/login');
-  };
+  }, [router]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await authService.logout();
     } catch (error) {
@@ -67,30 +67,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     authService.clearCache();
     router.push('/login');
-  };
+  }, [router]);
 
-  const refreshAuth = async () => {
+  const refreshAuth = useCallback(async () => {
     hasCheckedAuth.current = false;
     await checkAuth();
-  };
+  }, []);
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     authService.clearCache();
     await checkAuth();
-  };
+  }, []);
+
+  const contextValue = useMemo(() => ({
+    user,
+    loading,
+    login,
+    logout,
+    isAuthenticated: !!user,
+    refreshAuth,
+    refreshUser,
+  }), [user, loading, login, logout, refreshAuth, refreshUser]);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        login,
-        logout,
-        isAuthenticated: !!user,
-        refreshAuth,
-        refreshUser,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

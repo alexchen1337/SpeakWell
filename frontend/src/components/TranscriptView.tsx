@@ -1,7 +1,51 @@
 'use client';
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, memo } from 'react';
 import { TranscriptWord } from '@/types/audio';
+
+const formatTime = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
+interface WordSpanProps {
+  word: TranscriptWord;
+  index: number;
+  isActive: boolean;
+  isPast: boolean;
+  isLast: boolean;
+  onWordClick: (time: number) => void;
+  activeWordRef: React.RefObject<HTMLSpanElement | null>;
+}
+
+const WordSpan = memo(function WordSpan({
+  word,
+  index,
+  isActive,
+  isPast,
+  isLast,
+  onWordClick,
+  activeWordRef,
+}: WordSpanProps) {
+  const handleClick = useCallback(() => {
+    onWordClick(word.start);
+  }, [onWordClick, word.start]);
+
+  return (
+    <React.Fragment>
+      <span
+        ref={isActive ? activeWordRef : null}
+        className={`transcript-word-new ${isActive ? 'active' : ''} ${isPast ? 'past' : ''}`}
+        onClick={handleClick}
+        data-time={formatTime(word.start)}
+      >
+        {word.word}
+      </span>
+      {!isLast && ' '}
+    </React.Fragment>
+  );
+});
 
 interface TranscriptViewProps {
   words: TranscriptWord[];
@@ -90,12 +134,6 @@ export default function TranscriptView({
     );
   }
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
   const currentWord = activeWordIndex >= 0 ? words[activeWordIndex] : null;
 
   return (
@@ -107,7 +145,7 @@ export default function TranscriptView({
             <span className="current-time">{formatTime(currentWord.start)}</span>
           )}
         </div>
-        <button 
+        <button
           className={`auto-scroll-toggle ${autoScroll ? 'active' : ''}`}
           onClick={() => setAutoScroll(!autoScroll)}
           title={autoScroll ? 'Disable auto-scroll' : 'Enable auto-scroll'}
@@ -118,24 +156,23 @@ export default function TranscriptView({
           {autoScroll ? 'Auto-scroll On' : 'Auto-scroll Off'}
         </button>
       </div>
-      <div 
-        ref={containerRef} 
+      <div
+        ref={containerRef}
         className="transcript-content-new"
         onScroll={handleScroll}
       >
         <div className="transcript-text-new">
           {words.map((word, index) => (
-            <React.Fragment key={`${index}-${word.start}`}>
-              <span
-                ref={index === activeWordIndex ? activeWordRef : null}
-                className={`transcript-word-new ${index === activeWordIndex ? 'active' : ''} ${index < activeWordIndex ? 'past' : ''}`}
-                onClick={() => handleWordClick(word.start)}
-                data-time={formatTime(word.start)}
-              >
-                {word.word}
-              </span>
-              {index < words.length - 1 && ' '}
-            </React.Fragment>
+            <WordSpan
+              key={`${index}-${word.start}`}
+              word={word}
+              index={index}
+              isActive={index === activeWordIndex}
+              isPast={index < activeWordIndex}
+              isLast={index === words.length - 1}
+              onWordClick={handleWordClick}
+              activeWordRef={activeWordRef}
+            />
           ))}
         </div>
       </div>
