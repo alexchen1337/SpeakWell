@@ -75,6 +75,40 @@ def download_file(object_key: str) -> bytes:
     return response
 
 
+def get_unique_filename(db: Session, user_id: str, filename: str) -> str:
+    """Generate a unique filename for the user by appending a number if needed."""
+    # Check if filename already exists
+    existing = db.query(AudioFile).filter(
+        AudioFile.user_id == user_id,
+        AudioFile.filename == filename
+    ).first()
+    
+    if not existing:
+        return filename
+    
+    # Extract base name and extension
+    base_name = filename
+    extension = ""
+    if "." in filename:
+        last_dot = filename.rfind(".")
+        base_name = filename[:last_dot]
+        extension = filename[last_dot:]
+    
+    # Find a unique name by appending numbers
+    counter = 1
+    while True:
+        new_filename = f"{base_name} ({counter}){extension}"
+        existing = db.query(AudioFile).filter(
+            AudioFile.user_id == user_id,
+            AudioFile.filename == new_filename
+        ).first()
+        if not existing:
+            return new_filename
+        counter += 1
+        if counter > 100:  # Safety limit
+            return f"{base_name} ({uuid.uuid4().hex[:8]}){extension}"
+
+
 @router.post("/upload")
 async def upload_audio(
     background_tasks: BackgroundTasks,
@@ -139,11 +173,14 @@ async def upload_audio(
             file_size = len(contents)
             duration = extract_audio_duration(contents, file.filename)
             
+            # Generate unique filename if duplicate exists
+            unique_filename = get_unique_filename(db, current_user.id, file.filename)
+            
             audio_file = AudioFile(
                 id=file_id,
                 user_id=current_user.id,
                 object_key=object_key,
-                filename=file.filename,
+                filename=unique_filename,
                 file_size=file_size,
                 duration=duration,
                 status=AudioStatus.uploaded,
@@ -168,8 +205,8 @@ async def upload_audio(
             
             uploaded_files.append({
                 "id": audio_file.id,
-                "title": audio_file.filename,
-                "filename": audio_file.filename,
+                "title": unique_filename,
+                "filename": unique_filename,
                 "url": secure_url,
                 "size": audio_file.file_size,
                 "duration": audio_file.duration,
@@ -247,6 +284,55 @@ async def get_audio(
     
     if not audio:
         raise HTTPException(status_code=404, detail="Audio file not found")
+    
+    return {
+        "id": audio.id,
+        "title": audio.filename,
+        "filename": audio.filename,
+        "url": generate_signed_url(audio.object_key),
+        "size": audio.file_size,
+        "duration": audio.duration,
+        "status": audio.status.value,
+        "uploadedAt": audio.created_at.isoformat(),
+        "updatedAt": audio.updated_at.isoformat(),
+    }
+
+
+@router.patch("/{audio_id}")
+async def update_audio(
+    audio_id: str,
+    title: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update audio file title/filename."""
+    audio = db.query(AudioFile).filter(
+        AudioFile.id == audio_id,
+        AudioFile.user_id == current_user.id
+    ).first()
+    
+    if not audio:
+        raise HTTPException(status_code=404, detail="Audio file not found")
+    
+    if not title or not title.strip():
+        raise HTTPException(status_code=400, detail="Title cannot be empty")
+    
+    clean_title = title.strip()
+    
+    # Check for duplicate name (excluding current file)
+    existing = db.query(AudioFile).filter(
+        AudioFile.user_id == current_user.id,
+        AudioFile.filename == clean_title,
+        AudioFile.id != audio_id
+    ).first()
+    
+    if existing:
+        raise HTTPException(status_code=409, detail="A presentation with this name already exists")
+    
+    audio.filename = clean_title
+    audio.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(audio)
     
     return {
         "id": audio.id,

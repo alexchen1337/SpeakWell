@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { AudioFile, TranscriptResponse } from '@/types/audio';
+import { Rubric, RubricCreateRequest, RubricUpdateRequest, Grading, GradingInitiateRequest } from '@/types/grading';
 import { API_URL } from '@/config';
 
 const API_BASE_URL = API_URL;
@@ -62,6 +63,13 @@ export const audioAPI = {
     return response.data;
   },
 
+  updateAudio: async (id: string, title: string): Promise<AudioFile> => {
+    const response = await axiosInstance.patch(`/api/audio/${id}`, null, {
+      params: { title }
+    });
+    return response.data;
+  },
+
   deleteAudio: async (id: string): Promise<void> => {
     await axiosInstance.delete(`/api/audio/${id}`);
   },
@@ -81,6 +89,72 @@ export const transcriptAPI = {
   retryTranscription: async (audioId: string): Promise<{ message: string; status: string }> => {
     const response = await axiosInstance.post(`/api/transcripts/${audioId}/retry`);
     return response.data;
+  },
+};
+
+// Transform rubric request from camelCase to snake_case for backend
+const transformRubricRequest = (data: RubricCreateRequest | RubricUpdateRequest) => ({
+  name: data.name,
+  description: data.description,
+  criteria: data.criteria?.map(c => ({
+    name: c.name,
+    description: c.description,
+    max_score: c.maxScore,
+    weight: c.weight,
+  })),
+});
+
+export const rubricAPI = {
+  list: async (): Promise<Rubric[]> => {
+    const response = await axiosInstance.get('/api/rubrics');
+    return response.data;
+  },
+
+  get: async (id: string): Promise<Rubric> => {
+    const response = await axiosInstance.get(`/api/rubrics/${id}`);
+    return response.data;
+  },
+
+  create: async (data: RubricCreateRequest): Promise<Rubric> => {
+    const response = await axiosInstance.post('/api/rubrics', transformRubricRequest(data));
+    return response.data;
+  },
+
+  update: async (id: string, data: RubricUpdateRequest): Promise<Rubric> => {
+    const response = await axiosInstance.put(`/api/rubrics/${id}`, transformRubricRequest(data));
+    return response.data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await axiosInstance.delete(`/api/rubrics/${id}`);
+  },
+};
+
+export const gradingAPI = {
+  initiate: async (data: GradingInitiateRequest, replaceExisting: boolean = false): Promise<Grading> => {
+    const response = await axiosInstance.post('/api/gradings', data, {
+      params: { replace_existing: replaceExisting }
+    });
+    return response.data;
+  },
+
+  listAll: async (): Promise<Grading[]> => {
+    const response = await axiosInstance.get('/api/gradings/all');
+    return response.data;
+  },
+
+  list: async (transcriptId: string): Promise<Grading[]> => {
+    const response = await axiosInstance.get(`/api/transcripts/${transcriptId}/gradings`);
+    return response.data;
+  },
+
+  get: async (gradingId: string): Promise<Grading> => {
+    const response = await axiosInstance.get(`/api/gradings/${gradingId}`);
+    return response.data;
+  },
+
+  delete: async (gradingId: string): Promise<void> => {
+    await axiosInstance.delete(`/api/gradings/${gradingId}`);
   },
 };
 

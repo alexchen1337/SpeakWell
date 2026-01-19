@@ -17,7 +17,13 @@ export default function LibraryPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [deletingIds, setDeletingIds] = useState<string[]>([]);
+  const [renamingIds, setRenamingIds] = useState<string[]>([]);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [uploadedFilesToRename, setUploadedFilesToRename] = useState<AudioFile[]>([]);
+  const [renamingIndex, setRenamingIndex] = useState(0);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameError, setRenameError] = useState('');
 
   const showNotification = useCallback((type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
@@ -65,11 +71,17 @@ export default function LibraryPage() {
       }));
       
       setAudioFiles(prev => [...newAudioFiles, ...prev]);
-      showNotification('success', `Successfully uploaded ${files.length} file${files.length > 1 ? 's' : ''}`);
+      
+      // Show rename modal immediately
+      setUploadedFilesToRename(newAudioFiles);
+      setRenamingIndex(0);
+      setRenameValue(newAudioFiles[0]?.title || '');
+      setShowRenameModal(true);
 
+      // Clear upload progress after showing modal
       setTimeout(() => {
         setUploadingFiles([]);
-      }, 2000);
+      }, 500);
 
     } catch (error: any) {
       const errorMessage = error.response?.data?.detail || error.message || 'Upload failed';
@@ -100,20 +112,104 @@ export default function LibraryPage() {
     router.push('/player');
   }, [router]);
 
+  const handleRenameAudio = useCallback(async (id: string, newTitle: string) => {
+    setRenamingIds(prev => [...prev, id]);
+    
+    try {
+      const updatedAudio = await audioAPI.updateAudio(id, newTitle);
+      setAudioFiles(prev => prev.map(audio => 
+        audio.id === id ? { ...audio, title: updatedAudio.title } : audio
+      ));
+      showNotification('success', 'Presentation renamed successfully');
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 'Failed to rename presentation';
+      showNotification('error', errorMessage);
+      throw error; // Re-throw so callers can handle it
+    } finally {
+      setRenamingIds(prev => prev.filter(renamingId => renamingId !== id));
+    }
+  }, [showNotification]);
+
   const handleDeleteAudio = useCallback(async (id: string) => {
     setDeletingIds(prev => [...prev, id]);
     
     try {
       await audioAPI.deleteAudio(id);
       setAudioFiles(prev => prev.filter(audio => audio.id !== id));
-      showNotification('success', 'Audio file deleted successfully');
+      showNotification('success', 'Presentation deleted successfully');
     } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || 'Failed to delete audio file';
+      const errorMessage = error.response?.data?.detail || 'Failed to delete presentation';
       showNotification('error', errorMessage);
     } finally {
       setDeletingIds(prev => prev.filter(deletingId => deletingId !== id));
     }
   }, [showNotification]);
+
+  const handleRenameModalSave = useCallback(async () => {
+    const currentFile = uploadedFilesToRename[renamingIndex];
+    if (!currentFile || !renameValue.trim()) return;
+    
+    setRenameError('');
+    const trimmedName = renameValue.trim();
+    
+    // Check for duplicate name client-side (excluding current file)
+    const isDuplicate = audioFiles.some(
+      f => f.id !== currentFile.id && f.title.toLowerCase() === trimmedName.toLowerCase()
+    );
+    
+    if (isDuplicate) {
+      setRenameError('A presentation with this name already exists');
+      return;
+    }
+
+    // Only rename if the value changed
+    if (trimmedName !== currentFile.title) {
+      try {
+        await handleRenameAudio(currentFile.id, trimmedName);
+      } catch (error: any) {
+        // Show inline error if it's a duplicate error from backend
+        const errorMessage = error.response?.data?.detail || 'Failed to rename';
+        setRenameError(errorMessage);
+        return;
+      }
+    }
+    
+    // Move to next file or close modal
+    if (renamingIndex < uploadedFilesToRename.length - 1) {
+      const nextIndex = renamingIndex + 1;
+      setRenamingIndex(nextIndex);
+      setRenameValue(uploadedFilesToRename[nextIndex].title);
+      setRenameError('');
+    } else {
+      setShowRenameModal(false);
+      setUploadedFilesToRename([]);
+      setRenamingIndex(0);
+      setRenameError('');
+      showNotification('success', `Successfully uploaded ${uploadedFilesToRename.length} file${uploadedFilesToRename.length > 1 ? 's' : ''}`);
+    }
+  }, [uploadedFilesToRename, renamingIndex, renameValue, audioFiles, handleRenameAudio, showNotification]);
+
+  const handleRenameModalSkip = useCallback(() => {
+    setRenameError('');
+    if (renamingIndex < uploadedFilesToRename.length - 1) {
+      const nextIndex = renamingIndex + 1;
+      setRenamingIndex(nextIndex);
+      setRenameValue(uploadedFilesToRename[nextIndex].title);
+    } else {
+      setShowRenameModal(false);
+      setUploadedFilesToRename([]);
+      setRenamingIndex(0);
+      showNotification('success', `Successfully uploaded ${uploadedFilesToRename.length} file${uploadedFilesToRename.length > 1 ? 's' : ''}`);
+    }
+  }, [uploadedFilesToRename, renamingIndex, showNotification]);
+
+  const handleRenameModalCancel = useCallback(() => {
+    setShowRenameModal(false);
+    setUploadedFilesToRename([]);
+    setRenamingIndex(0);
+    setRenameError('');
+    showNotification('success', `Successfully uploaded ${uploadedFilesToRename.length} file${uploadedFilesToRename.length > 1 ? 's' : ''}`);
+  }, [uploadedFilesToRename.length, showNotification]);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -179,52 +275,11 @@ export default function LibraryPage() {
       )}
 
       <div className="library-header">
-        <h1>Audio Library</h1>
-        <p>Upload and manage your audio files for transcription</p>
+        <h1>Presentation Library</h1>
+        <p>Upload and manage your presentations for transcription and analysis</p>
       </div>
 
       <div className="library-content">
-        {uploadingFiles.length > 0 && (
-          <div className="upload-progress-section">
-            {uploadingFiles.map((file) => (
-              <div key={file.id} className={`upload-progress-item ${file.status}`}>
-                <div className="upload-file-info">
-                  <svg className="file-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                  </svg>
-                  <div className="file-details">
-                    <span className="file-name">{file.file.name}</span>
-                    <span className="file-size">{((file.file.size) / (1024 * 1024)).toFixed(1)} MB</span>
-                  </div>
-                  {file.status === 'success' && (
-                    <svg className="status-icon success" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                  {file.status === 'error' && (
-                    <svg className="status-icon error" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  )}
-                </div>
-                
-                {file.status === 'uploading' && (
-                  <div className="progress-bar-container">
-                    <div className="progress-bar" style={{ width: `${file.progress}%` }}></div>
-                  </div>
-                )}
-                
-                {file.status === 'error' && file.error && (
-                  <div className="error-info">
-                    <span className="error-message">{file.error}</span>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
         <div className="library-section-new">
           <div className="section-header">
             <h2>Presentations</h2>
@@ -234,11 +289,12 @@ export default function LibraryPage() {
                 <input
                   type="file"
                   accept="audio/*"
+                  multiple
                   onChange={(e) => {
                     const files = Array.from(e.target.files || []);
-                    const audioFile = files.find(file => file.type.startsWith('audio/'));
-                    if (audioFile) {
-                      handleFilesSelected([audioFile]);
+                    const audioFiles = files.filter(file => file.type.startsWith('audio/'));
+                    if (audioFiles.length > 0) {
+                      handleFilesSelected(audioFiles);
                     }
                     e.target.value = '';
                   }}
@@ -253,25 +309,121 @@ export default function LibraryPage() {
             </div>
           </div>
           
-          {audioFiles.length === 0 ? (
+          {audioFiles.length === 0 && uploadingFiles.length === 0 ? (
             <div className="empty-library">
               <svg className="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
               </svg>
-              <h3>No audio files yet</h3>
-              <p>Upload your first file to get started with transcription and analysis</p>
+              <h3>No presentations yet</h3>
+              <p>Upload your first presentation to get started with transcription and analysis</p>
             </div>
           ) : (
-            <AudioList
-              audioFiles={audioFiles}
-              selectedAudioId={null}
-              onSelectAudio={handleSelectAudio}
-              onDeleteAudio={handleDeleteAudio}
-              deletingIds={deletingIds}
-            />
+            <>
+              {uploadingFiles.length > 0 && (
+                <div className="files-grid" style={{ marginBottom: audioFiles.length > 0 ? '2rem' : '0' }}>
+                  {uploadingFiles.map((file) => (
+                    <div key={file.id} className={`file-card uploading-card ${file.status}`}>
+                      <div className="file-card-icon skeleton-pulse">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                        </svg>
+                      </div>
+                      <div className="file-card-content">
+                        <h3 className="file-card-title">{file.file.name}</h3>
+                        <div className="file-card-meta">
+                          <span className="meta-item">
+                            {file.status === 'uploading' && `${file.progress}%`}
+                            {file.status === 'success' && 'Complete'}
+                            {file.status === 'error' && 'Failed'}
+                          </span>
+                        </div>
+                        {file.status === 'uploading' && (
+                          <div className="progress-bar-container" style={{ marginTop: '0.5rem' }}>
+                            <div className="progress-bar" style={{ width: `${file.progress}%` }}></div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {audioFiles.length > 0 && (
+                <AudioList
+                  audioFiles={audioFiles}
+                  selectedAudioId={null}
+                  onSelectAudio={handleSelectAudio}
+                  onDeleteAudio={handleDeleteAudio}
+                  onRenameAudio={handleRenameAudio}
+                  deletingIds={deletingIds}
+                  renamingIds={renamingIds}
+                />
+              )}
+            </>
           )}
         </div>
       </div>
+
+      {/* Rename Modal */}
+      {showRenameModal && uploadedFilesToRename.length > 0 && (
+        <div className="modal-overlay" onClick={handleRenameModalCancel}>
+          <div className="modal-content rename-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Name Your Presentation</h2>
+              <button className="modal-close" onClick={handleRenameModalCancel}>
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              <p className="rename-modal-subtitle">
+                {uploadedFilesToRename.length > 1 
+                  ? `File ${renamingIndex + 1} of ${uploadedFilesToRename.length}`
+                  : 'Give your presentation a memorable name'}
+              </p>
+              
+              <div className="form-group">
+                <label htmlFor="rename-input">Presentation Name</label>
+                <input
+                  id="rename-input"
+                  type="text"
+                  className={`form-input ${renameError ? 'input-error' : ''}`}
+                  value={renameValue}
+                  onChange={(e) => {
+                    setRenameValue(e.target.value);
+                    if (renameError) setRenameError('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleRenameModalSave();
+                    } else if (e.key === 'Escape') {
+                      handleRenameModalCancel();
+                    }
+                  }}
+                  placeholder="Enter presentation name"
+                  autoFocus
+                />
+                {renameError && <span className="field-error">{renameError}</span>}
+              </div>
+            </div>
+            
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={handleRenameModalSkip}>
+                {renamingIndex < uploadedFilesToRename.length - 1 ? 'Skip' : 'Skip All'}
+              </button>
+              <button 
+                className="btn-primary" 
+                onClick={handleRenameModalSave}
+                disabled={!renameValue.trim()}
+              >
+                {renamingIndex < uploadedFilesToRename.length - 1 ? 'Save & Next' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

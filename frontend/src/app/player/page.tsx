@@ -3,10 +3,13 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { audioAPI, transcriptAPI } from '@/services/api';
+import { audioAPI, transcriptAPI, rubricAPI, gradingAPI } from '@/services/api';
 import AudioPlayer, { AudioPlayerHandle } from '@/components/AudioPlayer';
 import TranscriptView from '@/components/TranscriptView';
+import RubricSelectorModal from '@/components/RubricSelectorModal';
+import GradingResultsModal from '@/components/GradingResultsModal';
 import { TranscriptWord } from '@/types/audio';
+import { Rubric, Grading } from '@/types/grading';
 
 interface StoredAudioFile {
   id: string;
@@ -25,10 +28,19 @@ export default function PlayerPage() {
   
   const [transcriptWords, setTranscriptWords] = useState<TranscriptWord[]>([]);
   const [transcriptStatus, setTranscriptStatus] = useState<'uploaded' | 'processing' | 'completed' | 'failed'>('uploaded');
+  const [transcriptId, setTranscriptId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [skeletonWidths, setSkeletonWidths] = useState<number[]>([]);
   const audioPlayerRef = useRef<AudioPlayerHandle>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Grading state
+  const [rubrics, setRubrics] = useState<Rubric[]>([]);
+  const [gradings, setGradings] = useState<Grading[]>([]);
+  const [showRubricSelector, setShowRubricSelector] = useState(false);
+  const [showGradingResults, setShowGradingResults] = useState(false);
+  const [gradingInProgress, setGradingInProgress] = useState(false);
+  const gradingPollRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -48,12 +60,62 @@ export default function PlayerPage() {
       
       if (response.transcript) {
         setTranscriptWords(response.transcript.words);
+        setTranscriptId(response.transcript.id);
       }
       
-      return response.status;
+      return { status: response.status, transcriptId: response.transcript?.id };
     } catch {
       return null;
     }
+  }, []);
+
+  const loadRubrics = useCallback(async () => {
+    try {
+      const data = await rubricAPI.list();
+      setRubrics(data);
+    } catch {
+      // Silent fail - rubrics are optional
+    }
+  }, []);
+
+  const loadGradings = useCallback(async (tId: string) => {
+    try {
+      const data = await gradingAPI.list(tId);
+      setGradings(data);
+      
+      // Check if any grading is still processing
+      const hasProcessing = data.some(g => g.status === 'processing');
+      if (hasProcessing) {
+        startGradingPolling(tId);
+      }
+    } catch {
+      // Silent fail
+    }
+  }, []);
+
+  const startGradingPolling = useCallback((tId: string) => {
+    if (gradingPollRef.current) {
+      clearInterval(gradingPollRef.current);
+    }
+    
+    gradingPollRef.current = setInterval(async () => {
+      try {
+        const data = await gradingAPI.list(tId);
+        setGradings(data);
+        
+        // Stop polling if no grading is processing
+        const hasProcessing = data.some(g => g.status === 'processing');
+        if (!hasProcessing) {
+          if (gradingPollRef.current) {
+            clearInterval(gradingPollRef.current);
+            gradingPollRef.current = null;
+          }
+          setGradingInProgress(false);
+        }
+      } catch {
+        // Silent fail
+      }
+    }, 3000);
   }, []);
 
   const startPolling = useCallback((audioId: string) => {
@@ -62,15 +124,19 @@ export default function PlayerPage() {
     }
     
     pollIntervalRef.current = setInterval(async () => {
-      const status = await loadTranscript(audioId);
-      if (status === 'completed' || status === 'failed') {
+      const result = await loadTranscript(audioId);
+      if (result?.status === 'completed' || result?.status === 'failed') {
         if (pollIntervalRef.current) {
           clearInterval(pollIntervalRef.current);
           pollIntervalRef.current = null;
         }
+        // Load gradings when transcript is complete
+        if (result?.status === 'completed' && result?.transcriptId) {
+          loadGradings(result.transcriptId);
+        }
       }
     }, 3000);
-  }, [loadTranscript]);
+  }, [loadTranscript, loadGradings]);
 
   const loadAudioFile = async () => {
     try {
@@ -99,9 +165,15 @@ export default function PlayerPage() {
         size: freshAudio.size,
       });
 
-      const status = await loadTranscript(freshAudio.id);
-      if (status === 'uploaded' || status === 'processing') {
+      // Load rubrics for grading
+      loadRubrics();
+
+      const result = await loadTranscript(freshAudio.id);
+      if (result?.status === 'uploaded' || result?.status === 'processing') {
         startPolling(freshAudio.id);
+      } else if (result?.status === 'completed' && result?.transcriptId) {
+        // Load existing gradings if transcript is complete
+        loadGradings(result.transcriptId);
       }
     } catch (err: any) {
       const errorMsg = err.response?.status === 404 
@@ -138,6 +210,41 @@ export default function PlayerPage() {
     router.push('/library');
   };
 
+  const handleInitiateGrading = async (rubricId: string) => {
+    if (!transcriptId) return;
+    
+    try {
+      setGradingInProgress(true);
+      setShowRubricSelector(false);
+      
+      const newGrading = await gradingAPI.initiate({
+        transcript_id: transcriptId,
+        rubric_id: rubricId,
+      });
+      
+      setGradings(prev => [...prev, newGrading]);
+      startGradingPolling(transcriptId);
+    } catch (err) {
+      setGradingInProgress(false);
+      console.error('Failed to initiate grading:', err);
+    }
+  };
+
+  const handleDeleteGrading = useCallback(async (gradingId: string) => {
+    try {
+      await gradingAPI.delete(gradingId);
+      setGradings(prev => {
+        const updated = prev.filter(g => g.id !== gradingId);
+        // Modal will auto-close via useEffect when gradings become empty
+        return updated;
+      });
+    } catch (err) {
+      console.error('Failed to delete grading:', err);
+      throw err; // Re-throw so modal can handle it
+    }
+  }, []);
+
+
   useEffect(() => {
     // Generate skeleton widths only on client side to avoid hydration mismatch
     if (typeof window !== 'undefined') {
@@ -149,6 +256,9 @@ export default function PlayerPage() {
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
+      }
+      if (gradingPollRef.current) {
+        clearInterval(gradingPollRef.current);
       }
     };
   }, []);
@@ -233,6 +343,9 @@ export default function PlayerPage() {
     return null;
   }
 
+  const completedGradings = gradings.filter(g => g.status === 'completed');
+  const processingGradings = gradings.filter(g => g.status === 'processing');
+
   return (
     <main className="player-container">
       <div className="player-header-bar">
@@ -242,8 +355,35 @@ export default function PlayerPage() {
           </svg>
           <span>Back to Library</span>
         </button>
-        <div className="player-file-size">
-          {(audio.size / (1024 * 1024)).toFixed(1)} MB
+        <div className="player-header-actions">
+          {transcriptStatus === 'completed' && (
+            <>
+              {processingGradings.length > 0 && (
+                <div className="grading-status-badge">
+                  <span className="spinner-small"></span>
+                  Grading...
+                </div>
+              )}
+              {completedGradings.length > 0 && (
+                <button 
+                  className="btn-secondary btn-small"
+                  onClick={() => setShowGradingResults(true)}
+                >
+                  View Grading ({completedGradings.length})
+                </button>
+              )}
+              <button 
+                className="btn-primary btn-small"
+                onClick={() => setShowRubricSelector(true)}
+                disabled={gradingInProgress}
+              >
+                Grade Presentation
+              </button>
+            </>
+          )}
+          <div className="player-file-size">
+            {(audio.size / (1024 * 1024)).toFixed(1)} MB
+          </div>
         </div>
       </div>
 
@@ -277,6 +417,22 @@ export default function PlayerPage() {
           />
         </div>
       </div>
+
+      {showRubricSelector && (
+        <RubricSelectorModal
+          rubrics={rubrics}
+          onSelect={handleInitiateGrading}
+          onCancel={() => setShowRubricSelector(false)}
+        />
+      )}
+
+      {showGradingResults && (
+        <GradingResultsModal
+          gradings={completedGradings}
+          onClose={() => setShowGradingResults(false)}
+          onDelete={handleDeleteGrading}
+        />
+      )}
     </main>
   );
 }

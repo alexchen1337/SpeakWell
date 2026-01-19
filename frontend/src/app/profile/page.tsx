@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { authService } from '@/services/auth';
+import { rubricAPI } from '@/services/api';
+import { Rubric, RubricCriterionRequest } from '@/types/grading';
+import RubricEditorModal from '@/components/RubricEditorModal';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -13,12 +16,84 @@ export default function ProfilePage() {
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  
+  // Rubric management state
+  const [rubrics, setRubrics] = useState<Rubric[]>([]);
+  const [loadingRubrics, setLoadingRubrics] = useState(true);
+  const [showRubricEditor, setShowRubricEditor] = useState(false);
+  const [editingRubric, setEditingRubric] = useState<Rubric | undefined>();
+  const [rubricError, setRubricError] = useState<string | null>(null);
+  const [rubricSuccess, setRubricSuccess] = useState<string | null>(null);
+
+  const loadRubrics = useCallback(async () => {
+    try {
+      setLoadingRubrics(true);
+      const data = await rubricAPI.list();
+      setRubrics(data);
+    } catch {
+      setRubricError('Failed to load rubrics');
+    } finally {
+      setLoadingRubrics(false);
+    }
+  }, []);
+
+  // Filter to show only custom rubrics
+  const customRubrics = rubrics.filter(r => r.rubricType === 'custom');
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       router.push('/login');
     }
   }, [isAuthenticated, loading, router]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadRubrics();
+    }
+  }, [isAuthenticated, loadRubrics]);
+
+  const handleCreateRubric = () => {
+    setEditingRubric(undefined);
+    setShowRubricEditor(true);
+    setRubricError(null);
+  };
+
+  const handleEditRubric = (rubric: Rubric) => {
+    setEditingRubric(rubric);
+    setShowRubricEditor(true);
+    setRubricError(null);
+  };
+
+  const handleSaveRubric = async (name: string, description: string, criteria: RubricCriterionRequest[]) => {
+    try {
+      if (editingRubric) {
+        await rubricAPI.update(editingRubric.id, { name, description, criteria });
+        setRubricSuccess('Rubric updated successfully');
+      } else {
+        await rubricAPI.create({ name, description, criteria });
+        setRubricSuccess('Rubric created successfully');
+      }
+      setShowRubricEditor(false);
+      setEditingRubric(undefined);
+      await loadRubrics();
+      setTimeout(() => setRubricSuccess(null), 3000);
+    } catch (err: any) {
+      throw new Error(err.response?.data?.detail || 'Failed to save rubric');
+    }
+  };
+
+  const handleDeleteRubric = async (rubricId: string) => {
+    if (!confirm('Are you sure you want to delete this rubric?')) return;
+    
+    try {
+      await rubricAPI.delete(rubricId);
+      setRubricSuccess('Rubric deleted successfully');
+      await loadRubrics();
+      setTimeout(() => setRubricSuccess(null), 3000);
+    } catch (err: any) {
+      setRubricError(err.response?.data?.detail || 'Failed to delete rubric');
+    }
+  };
 
   if (loading) {
     return (
@@ -181,6 +256,64 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* Custom Rubrics Section */}
+        <div className="profile-card">
+          <div className="rubric-section-header">
+            <h2>Custom Grading Rubrics</h2>
+            <button onClick={handleCreateRubric} className="btn-primary btn-small">
+              + Create Rubric
+            </button>
+          </div>
+          
+          {rubricError && (
+            <div className="profile-message error-message-profile">
+              {rubricError}
+            </div>
+          )}
+          
+          {rubricSuccess && (
+            <div className="profile-message success-message-profile">
+              {rubricSuccess}
+            </div>
+          )}
+
+          {loadingRubrics ? (
+            <div className="rubric-list">
+              {[1, 2].map(i => (
+                <div key={i} className="rubric-item skeleton">
+                  <div className="skeleton-line" style={{ height: '20px', width: '60%', marginBottom: '0.5rem' }}></div>
+                  <div className="skeleton-line" style={{ height: '14px', width: '80%', marginBottom: '0.5rem' }}></div>
+                  <div className="skeleton-line" style={{ height: '12px', width: '40%' }}></div>
+                </div>
+              ))}
+            </div>
+          ) : customRubrics.length === 0 ? (
+            <div className="empty-rubrics">
+              <p>No custom rubrics yet. Create one to use for grading presentations.</p>
+            </div>
+          ) : (
+            <div className="rubric-list">
+              {customRubrics.map(rubric => (
+                <div key={rubric.id} className="rubric-item">
+                  <div className="rubric-info">
+                    <h3>{rubric.name}</h3>
+                    {rubric.description && <p>{rubric.description}</p>}
+                    <span className="criteria-count">{rubric.criteria.length} criteria</span>
+                  </div>
+                  <div className="rubric-actions">
+                    <button onClick={() => handleEditRubric(rubric)} className="btn-edit">
+                      Edit
+                    </button>
+                    <button onClick={() => handleDeleteRubric(rubric.id)} className="btn-danger btn-small">
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="profile-actions">
           <button onClick={() => router.push('/')} className="btn-secondary">
             Back to library
@@ -190,6 +323,17 @@ export default function ProfilePage() {
           </button>
         </div>
       </div>
+
+      {showRubricEditor && (
+        <RubricEditorModal
+          rubric={editingRubric}
+          onSave={handleSaveRubric}
+          onCancel={() => {
+            setShowRubricEditor(false);
+            setEditingRubric(undefined);
+          }}
+        />
+      )}
     </main>
   );
 }

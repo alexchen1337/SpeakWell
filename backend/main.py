@@ -6,6 +6,8 @@ import os
 from auth import router as auth_router
 from audio import router as audio_router
 from transcription import router as transcription_router
+from rubrics import router as rubrics_router
+from grading import router as grading_router
 from database import init_db
 
 app = FastAPI(title="Speakwell Audio API")
@@ -28,6 +30,8 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 app.include_router(auth_router)
 app.include_router(audio_router)
 app.include_router(transcription_router)
+app.include_router(rubrics_router)
+app.include_router(grading_router)
 
 
 @app.on_event("startup")
