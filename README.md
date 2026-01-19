@@ -1,3 +1,22 @@
+## What This Project Does
+
+This project automatically grades student presentations using AI, based on
+**ABET-aligned rubrics** or fully **custom evaluation criteria**.
+
+Users upload **audio or video presentations**, which are then:
+- Transcribed using OpenAI's state-of-the-art speech-to-text models
+- Evaluated by large language models against structured rubrics
+- Scored with clear, criterion-level feedback
+
+The system is built with a modern full-stack architecture:
+- **Next.js** for the frontend
+- **FastAPI** for the backend API
+- **Supabase with PostgreSQL** for authentication, storage, and database management
+
+It is designed for **educators, teaching assistants, and academic evaluators**
+who need consistent, scalable, and explainable presentation grading.
+
+
 # Demo
 
 https://github.com/user-attachments/assets/c8abbb61-b754-4d6b-9037-38672448e831
