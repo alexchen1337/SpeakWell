@@ -21,7 +21,7 @@ interface StoredAudioFile {
 
 export default function PlayerPage() {
   const router = useRouter();
-  const { isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const [audio, setAudio] = useState<StoredAudioFile | null>(null);
   const [loadingAudio, setLoadingAudio] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -431,6 +431,7 @@ export default function PlayerPage() {
           gradings={completedGradings}
           onClose={() => setShowGradingResults(false)}
           onDelete={handleDeleteGrading}
+          currentUserId={user?.id}
         />
       )}
     </main>

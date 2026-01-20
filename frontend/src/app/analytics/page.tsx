@@ -10,7 +10,7 @@ import RubricEditorModal from '@/components/RubricEditorModal';
 
 export default function AnalyticsPage() {
   const router = useRouter();
-  const { isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const [gradings, setGradings] = useState<Grading[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [selectedGrading, setSelectedGrading] = useState<Grading | null>(null);
@@ -403,6 +403,7 @@ export default function AnalyticsPage() {
             setSelectedGrading(null);
           }}
           onDelete={handleDeleteGrading}
+          currentUserId={user?.id}
         />
       )}
 

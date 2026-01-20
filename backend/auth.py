@@ -413,6 +413,33 @@ async def update_user_name(
     }
 
 
+class UpdateRoleRequest(BaseModel):
+    role: str
+    
+    @validator('role')
+    def validate_role(cls, v):
+        if v not in ("student", "instructor"):
+            raise ValueError("Role must be either 'student' or 'instructor'")
+        return v
+
+
+@router.patch("/me/role")
+async def update_user_role(
+    request: UpdateRoleRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update the current user's role (student or instructor)."""
+    current_user.role = request.role
+    db.commit()
+    db.refresh(current_user)
+    
+    return {
+        "message": "Role updated successfully",
+        "role": current_user.role
+    }
+
+
 @router.post("/refresh")
 async def refresh_access_token(
     response: Response,

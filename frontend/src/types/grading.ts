@@ -47,6 +47,7 @@ export interface Grading {
   id: string;
   transcriptId: string;
   audioFileId: string | null;
+  audioOwnerId: string | null;
   presentationTitle: string | null;
   rubricId: string | null;
   rubricName: string | null;
@@ -65,6 +66,9 @@ export interface Grading {
   clarityScore: number | null;
 
   detailedResults: GradingDetailedResults | null;
+  gradedByUserId: string | null;
+  gradedByName: string | null;
+  gradedByRole: string | null;
   createdAt: string;
 }
 

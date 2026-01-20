@@ -8,6 +8,7 @@ interface GradingResultsModalProps {
   gradings: Grading[];
   onClose: () => void;
   onDelete: (gradingId: string) => Promise<void> | void;
+  currentUserId?: string;
 }
 
 type ViewTab = 'overview' | 'content' | 'delivery';
@@ -15,7 +16,8 @@ type ViewTab = 'overview' | 'content' | 'delivery';
 export default function GradingResultsModal({
   gradings,
   onClose,
-  onDelete
+  onDelete,
+  currentUserId
 }: GradingResultsModalProps) {
   const [selectedGradingIndex, setSelectedGradingIndex] = useState(0);
   const [activeView, setActiveView] = useState<ViewTab>('overview');
@@ -79,6 +81,35 @@ export default function GradingResultsModal({
   const isFailed = currentGrading.status === 'failed';
   const isCompleted = currentGrading.status === 'completed';
 
+  // Determine if user can delete this grading:
+  // - Audio owner can delete any grading on their presentation
+  // - Grading creator can delete their own grading
+  const isAudioOwner = currentUserId && currentGrading.audioOwnerId 
+    ? currentUserId === currentGrading.audioOwnerId 
+    : false;
+  const isGradingCreator = currentUserId && currentGrading.gradedByUserId
+    ? currentUserId === currentGrading.gradedByUserId
+    : false;
+  const canDelete = isAudioOwner || isGradingCreator || !currentUserId; // default to true if no user info
+
+  // Determine graded-by label
+  const getGradedByLabel = () => {
+    if (!currentGrading.gradedByUserId) return null;
+    
+    // If graded by someone else (not the audio owner)
+    if (currentGrading.audioOwnerId && currentGrading.gradedByUserId !== currentGrading.audioOwnerId) {
+      if (currentGrading.gradedByRole === 'instructor') {
+        return 'Graded by instructor';
+      }
+      return `Graded by ${currentGrading.gradedByName || 'another user'}`;
+    }
+    
+    // Graded by owner
+    return 'Self-graded';
+  };
+
+  const gradedByLabel = getGradedByLabel();
+
   // Safe getters for scores
   const overallScore = currentGrading.overallScore ?? 0;
   const pacingScore = currentGrading.pacingScore ?? 0;
@@ -118,9 +149,16 @@ export default function GradingResultsModal({
               </div>
             )}
           </div>
-          {currentGrading.rubricName && gradings.length === 1 && (
-            <p className="grading-rubric-name">Using: {currentGrading.rubricName}</p>
-          )}
+          <div className="grading-header-meta">
+            {currentGrading.rubricName && gradings.length === 1 && (
+              <p className="grading-rubric-name">Using: {currentGrading.rubricName}</p>
+            )}
+            {gradedByLabel && isCompleted && (
+              <span className={`graded-by-badge ${currentGrading.gradedByRole === 'instructor' && currentGrading.gradedByUserId !== currentGrading.audioOwnerId ? 'instructor' : ''}`}>
+                {gradedByLabel}
+              </span>
+            )}
+          </div>
         </header>
 
         {/* Content */}
@@ -416,7 +454,7 @@ export default function GradingResultsModal({
             Close
           </button>
           <div className="footer-actions">
-            {isCompleted && (
+            {isCompleted && canDelete && (
               <button 
                 className="footer-btn danger" 
                 onClick={handleDelete}

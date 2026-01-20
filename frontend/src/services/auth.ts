@@ -84,6 +84,12 @@ export const authService = {
     return response.data;
   },
 
+  updateRole: async (role: 'student' | 'instructor'): Promise<{ message: string; role: string }> => {
+    currentUserCache = null;
+    const response = await axiosInstance.patch('/auth/me/role', { role });
+    return response.data;
+  },
+
   login: async (email: string, password: string): Promise<void> => {
     currentUserCache = null;
     await axiosInstance.post('/auth/login', { email, password });

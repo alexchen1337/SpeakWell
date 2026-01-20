@@ -4,9 +4,27 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 import uuid
 
-from database import get_db, SessionLocal, User, Transcript, Rubric, Grading, GradingStatus, AudioFile
+from database import get_db, SessionLocal, User, Transcript, Rubric, Grading, GradingStatus, AudioFile, Classroom
 from auth import get_current_user
 from grading_engine import grade_presentation
+
+
+def can_access_audio(audio: AudioFile, user: User, db: Session) -> bool:
+    """
+    Check if user can access an audio file.
+    - Owner can always access
+    - Instructor can access if audio is linked to their class
+    """
+    if audio.user_id == user.id:
+        return True
+    
+    # Check if user is an instructor for the audio's class
+    if audio.class_id:
+        classroom = db.query(Classroom).filter(Classroom.id == audio.class_id).first()
+        if classroom and classroom.instructor_id == user.id:
+            return True
+    
+    return False
 
 router = APIRouter(prefix="/api", tags=["grading"])
 
@@ -20,6 +38,7 @@ class GradingResponse(BaseModel):
     id: str
     transcriptId: str = Field(alias="transcriptId")
     audioFileId: Optional[str] = Field(alias="audioFileId")
+    audioOwnerId: Optional[str] = Field(default=None, alias="audioOwnerId")
     presentationTitle: Optional[str] = Field(alias="presentationTitle")
     rubricId: Optional[str] = Field(alias="rubricId")
     rubricName: Optional[str] = Field(alias="rubricName")
@@ -35,6 +54,9 @@ class GradingResponse(BaseModel):
     clarityNonsensicalWordCount: Optional[int] = Field(alias="clarityNonsensicalWordCount")
     clarityScore: Optional[float] = Field(alias="clarityScore")
     detailedResults: Optional[dict] = Field(alias="detailedResults")
+    gradedByUserId: Optional[str] = Field(default=None, alias="gradedByUserId")
+    gradedByName: Optional[str] = Field(default=None, alias="gradedByName")
+    gradedByRole: Optional[str] = Field(default=None, alias="gradedByRole")
     createdAt: str = Field(alias="createdAt")
 
     class Config:
@@ -46,13 +68,17 @@ def build_grading_response(
     grading: Grading, 
     rubric_name: Optional[str] = None,
     audio_file_id: Optional[str] = None,
-    presentation_title: Optional[str] = None
+    audio_owner_id: Optional[str] = None,
+    presentation_title: Optional[str] = None,
+    graded_by_name: Optional[str] = None,
+    graded_by_role: Optional[str] = None
 ) -> GradingResponse:
     """Build a GradingResponse from a Grading object."""
     return GradingResponse(
         id=grading.id,
         transcriptId=grading.transcript_id,
         audioFileId=audio_file_id,
+        audioOwnerId=audio_owner_id,
         presentationTitle=presentation_title,
         rubricId=grading.rubric_id,
         rubricName=rubric_name,
@@ -68,6 +94,9 @@ def build_grading_response(
         clarityNonsensicalWordCount=grading.clarity_nonsensical_word_count,
         clarityScore=grading.clarity_score,
         detailedResults=grading.detailed_results,
+        gradedByUserId=grading.graded_by_user_id,
+        gradedByName=graded_by_name,
+        gradedByRole=graded_by_role,
         createdAt=grading.created_at.isoformat()
     )
 
@@ -97,14 +126,17 @@ def initiate_grading(
     replace_existing: bool = False
 ):
     """Initiate grading for a transcript."""
-    # Verify transcript exists and belongs to user
+    # Verify transcript exists
     transcript = db.query(Transcript).filter(Transcript.id == request.transcript_id).first()
     if not transcript:
         raise HTTPException(status_code=404, detail="Transcript not found")
 
-    # Check ownership via AudioFile
+    # Check access via AudioFile (owner or instructor of class)
     audio_file = db.query(AudioFile).filter(AudioFile.id == transcript.audio_file_id).first()
-    if not audio_file or audio_file.user_id != current_user.id:
+    if not audio_file:
+        raise HTTPException(status_code=404, detail="Audio file not found")
+    
+    if not can_access_audio(audio_file, current_user, db):
         raise HTTPException(status_code=403, detail="Access denied")
 
     # Verify rubric exists and user has access
@@ -138,6 +170,7 @@ def initiate_grading(
         existing_grading.clarity_nonsensical_word_count = None
         existing_grading.clarity_score = None
         existing_grading.detailed_results = None
+        existing_grading.graded_by_user_id = current_user.id
         
         db.commit()
         db.refresh(existing_grading)
@@ -145,7 +178,15 @@ def initiate_grading(
         # Trigger background task
         background_tasks.add_task(run_grading_task, existing_grading.id)
         
-        return build_grading_response(existing_grading, rubric.name)
+        return build_grading_response(
+            existing_grading, 
+            rubric.name,
+            audio_file_id=audio_file.id,
+            audio_owner_id=audio_file.user_id,
+            presentation_title=audio_file.filename,
+            graded_by_name=current_user.name,
+            graded_by_role=current_user.role
+        )
     else:
         # Create new grading record
         grading_id = str(uuid.uuid4())
@@ -153,6 +194,7 @@ def initiate_grading(
             id=grading_id,
             transcript_id=request.transcript_id,
             rubric_id=request.rubric_id,
+            graded_by_user_id=current_user.id,
             status=GradingStatus.processing
         )
 
@@ -163,7 +205,15 @@ def initiate_grading(
         # Trigger background task
         background_tasks.add_task(run_grading_task, grading_id)
 
-        return build_grading_response(grading, rubric.name)
+        return build_grading_response(
+            grading, 
+            rubric.name,
+            audio_file_id=audio_file.id,
+            audio_owner_id=audio_file.user_id,
+            presentation_title=audio_file.filename,
+            graded_by_name=current_user.name,
+            graded_by_role=current_user.role
+        )
 
 
 @router.get("/transcripts/{transcript_id}/gradings", response_model=List[GradingResponse])
@@ -173,14 +223,17 @@ def list_transcript_gradings(
     db: Session = Depends(get_db)
 ):
     """List all gradings for a transcript."""
-    # Verify transcript exists and belongs to user
+    # Verify transcript exists
     transcript = db.query(Transcript).filter(Transcript.id == transcript_id).first()
     if not transcript:
         raise HTTPException(status_code=404, detail="Transcript not found")
 
-    # Check ownership via AudioFile
+    # Check access via AudioFile
     audio_file = db.query(AudioFile).filter(AudioFile.id == transcript.audio_file_id).first()
-    if not audio_file or audio_file.user_id != current_user.id:
+    if not audio_file:
+        raise HTTPException(status_code=404, detail="Audio file not found")
+    
+    if not can_access_audio(audio_file, current_user, db):
         raise HTTPException(status_code=403, detail="Access denied")
 
     gradings = db.query(Grading).filter(Grading.transcript_id == transcript_id).all()
@@ -189,10 +242,23 @@ def list_transcript_gradings(
     rubric_ids = [g.rubric_id for g in gradings if g.rubric_id]
     rubrics = {r.id: r.name for r in db.query(Rubric).filter(Rubric.id.in_(rubric_ids)).all()}
 
-    return [
-        build_grading_response(g, rubrics.get(g.rubric_id) if g.rubric_id else None)
-        for g in gradings
-    ]
+    # Build graded-by lookup
+    graded_by_ids = [g.graded_by_user_id for g in gradings if g.graded_by_user_id]
+    graded_by_users = {u.id: u for u in db.query(User).filter(User.id.in_(graded_by_ids)).all()}
+
+    result = []
+    for g in gradings:
+        graded_by = graded_by_users.get(g.graded_by_user_id) if g.graded_by_user_id else None
+        result.append(build_grading_response(
+            g, 
+            rubrics.get(g.rubric_id) if g.rubric_id else None,
+            audio_file_id=audio_file.id,
+            audio_owner_id=audio_file.user_id,
+            presentation_title=audio_file.filename,
+            graded_by_name=graded_by.name if graded_by else None,
+            graded_by_role=graded_by.role if graded_by else None
+        ))
+    return result
 
 
 @router.get("/gradings/all", response_model=List[GradingResponse])
@@ -220,16 +286,24 @@ def list_all_user_gradings(
     # Build audio file lookup
     audio_file_map = {af.id: af for af in audio_files}
     
+    # Build graded-by lookup
+    graded_by_ids = [g.graded_by_user_id for g in gradings if g.graded_by_user_id]
+    graded_by_users = {u.id: u for u in db.query(User).filter(User.id.in_(graded_by_ids)).all()}
+    
     result = []
     for g in gradings:
         transcript = transcript_map.get(g.transcript_id)
         audio_file = audio_file_map.get(transcript.audio_file_id) if transcript else None
+        graded_by = graded_by_users.get(g.graded_by_user_id) if g.graded_by_user_id else None
         
         result.append(build_grading_response(
             g,
             rubrics.get(g.rubric_id) if g.rubric_id else None,
             audio_file.id if audio_file else None,
-            audio_file.filename if audio_file else None
+            audio_file.user_id if audio_file else None,
+            audio_file.filename if audio_file else None,
+            graded_by.name if graded_by else None,
+            graded_by.role if graded_by else None
         ))
     
     return result
@@ -246,13 +320,16 @@ def get_grading(
     if not grading:
         raise HTTPException(status_code=404, detail="Grading not found")
 
-    # Verify ownership via transcript -> audio file
+    # Verify access via transcript -> audio file
     transcript = db.query(Transcript).filter(Transcript.id == grading.transcript_id).first()
     if not transcript:
         raise HTTPException(status_code=404, detail="Transcript not found")
 
     audio_file = db.query(AudioFile).filter(AudioFile.id == transcript.audio_file_id).first()
-    if not audio_file or audio_file.user_id != current_user.id:
+    if not audio_file:
+        raise HTTPException(status_code=404, detail="Audio file not found")
+    
+    if not can_access_audio(audio_file, current_user, db):
         raise HTTPException(status_code=403, detail="Access denied")
 
     # Get rubric name
@@ -262,7 +339,24 @@ def get_grading(
         if rubric:
             rubric_name = rubric.name
 
-    return build_grading_response(grading, rubric_name)
+    # Get graded-by user info
+    graded_by_name = None
+    graded_by_role = None
+    if grading.graded_by_user_id:
+        graded_by = db.query(User).filter(User.id == grading.graded_by_user_id).first()
+        if graded_by:
+            graded_by_name = graded_by.name
+            graded_by_role = graded_by.role
+
+    return build_grading_response(
+        grading, 
+        rubric_name,
+        audio_file_id=audio_file.id,
+        audio_owner_id=audio_file.user_id,
+        presentation_title=audio_file.filename,
+        graded_by_name=graded_by_name,
+        graded_by_role=graded_by_role
+    )
 
 
 @router.delete("/gradings/{grading_id}", status_code=204)
@@ -271,18 +365,30 @@ def delete_grading(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Delete a grading (owner only)."""
+    """Delete a grading. Allowed for:
+    - The audio owner (can delete any grading on their presentation)
+    - The grading creator (can delete gradings they initiated)
+    """
     grading = db.query(Grading).filter(Grading.id == grading_id).first()
     if not grading:
         raise HTTPException(status_code=404, detail="Grading not found")
 
-    # Verify ownership via transcript -> audio file
+    # Check if user is the grading creator
+    is_grading_creator = grading.graded_by_user_id == current_user.id
+
+    # Check if user is the audio owner
     transcript = db.query(Transcript).filter(Transcript.id == grading.transcript_id).first()
     if not transcript:
         raise HTTPException(status_code=404, detail="Transcript not found")
 
     audio_file = db.query(AudioFile).filter(AudioFile.id == transcript.audio_file_id).first()
-    if not audio_file or audio_file.user_id != current_user.id:
+    if not audio_file:
+        raise HTTPException(status_code=404, detail="Audio file not found")
+    
+    is_audio_owner = audio_file.user_id == current_user.id
+
+    # Allow deletion if user is either the audio owner or grading creator
+    if not is_audio_owner and not is_grading_creator:
         raise HTTPException(status_code=403, detail="Access denied")
 
     db.delete(grading)
