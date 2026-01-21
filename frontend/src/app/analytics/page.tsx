@@ -409,7 +409,7 @@ export default function AnalyticsPage() {
 
       {showRubricEditor && (
         <RubricEditorModal
-          rubric={editingRubric}
+          rubric={editingRubric || undefined}
           onSave={handleSaveRubric}
           onCancel={() => {
             setShowRubricEditor(false);
