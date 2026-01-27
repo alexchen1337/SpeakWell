@@ -42,6 +42,9 @@ export default function PlayerPage() {
   const [gradingInProgress, setGradingInProgress] = useState(false);
   const gradingPollRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Class submission context - students cannot self-grade class submissions
+  const [isStudentClassSubmission, setIsStudentClassSubmission] = useState(false);
+
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       router.push('/login');
@@ -151,6 +154,16 @@ export default function PlayerPage() {
 
       const audioData = JSON.parse(storedAudio);
       
+      // Check if this is a student viewing their own class submission
+      // Students cannot self-grade class submissions - only instructors can
+      const isClassSubmission = audioData.isClassSubmission === true;
+      const isInstructorGrading = audioData.isInstructorGrading === true;
+      
+      // If it's a class submission and NOT an instructor grading session, disable grading
+      if (isClassSubmission && !isInstructorGrading) {
+        setIsStudentClassSubmission(true);
+      }
+      
       const freshAudio = await audioAPI.getAudio(audioData.id);
       
       if (!freshAudio.url) {
@@ -192,6 +205,24 @@ export default function PlayerPage() {
   const handleTimeUpdate = useCallback((time: number) => {
     setCurrentTime(time);
   }, []);
+
+  // When AudioPlayer calculates duration, save it to database if it was missing
+  const handleDurationReady = useCallback(async (calculatedDuration: number) => {
+    if (!audio) return;
+    
+    // Only update if our stored duration was null/undefined/0
+    if (!audio.duration && calculatedDuration > 0) {
+      try {
+        console.log('Saving duration to database:', audio.id, Math.round(calculatedDuration));
+        await audioAPI.updateDuration(audio.id, Math.round(calculatedDuration));
+        // Update local state too
+        setAudio(prev => prev ? { ...prev, duration: Math.round(calculatedDuration) } : null);
+        console.log('Duration saved successfully');
+      } catch (err) {
+        console.error('Failed to save duration:', err);
+      }
+    }
+  }, [audio]);
 
   const handleRetryTranscription = async () => {
     if (!audio) return;
@@ -372,13 +403,23 @@ export default function PlayerPage() {
                   View Grading ({completedGradings.length})
                 </button>
               )}
-              <button 
-                className="btn-primary btn-small"
-                onClick={() => setShowRubricSelector(true)}
-                disabled={gradingInProgress}
-              >
-                Grade Presentation
-              </button>
+              {isStudentClassSubmission ? (
+                <button 
+                  className="btn-disabled btn-small"
+                  disabled
+                  title="Only your instructor can grade class submissions. Upload to your Library for self-practice."
+                >
+                  Awaiting Instructor Grade
+                </button>
+              ) : (
+                <button 
+                  className="btn-primary btn-small"
+                  onClick={() => setShowRubricSelector(true)}
+                  disabled={gradingInProgress}
+                >
+                  Grade Presentation
+                </button>
+              )}
             </>
           )}
           <div className="player-file-size">
@@ -396,6 +437,7 @@ export default function PlayerPage() {
             ref={audioPlayerRef}
             audio={audio} 
             onTimeUpdate={handleTimeUpdate}
+            onDurationReady={handleDurationReady}
           />
         </div>
 

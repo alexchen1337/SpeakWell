@@ -43,6 +43,9 @@ export interface GradingDetailedResults {
   ai_feedback: string;
 }
 
+export type GradingSourceType = 'self' | 'instructor';
+export type GradingContextType = 'practice' | 'class';
+
 export interface Grading {
   id: string;
   transcriptId: string;
@@ -54,6 +57,13 @@ export interface Grading {
   status: 'processing' | 'completed' | 'failed';
   overallScore: number | null;
   maxPossibleScore: number | null;
+
+  // Grading context fields
+  sourceType: GradingSourceType;
+  contextType: GradingContextType;
+  contextId: string | null;  // class_id when contextType = "class"
+  contextName: string | null;  // class name for display
+  isOfficial: boolean;
 
   pacingWpmAvg: number | null;
   pacingWpmVariance: number | null;
@@ -94,4 +104,9 @@ export interface RubricUpdateRequest {
 export interface GradingInitiateRequest {
   transcript_id: string;
   rubric_id: string;
+  // Optional grading context fields
+  source_type?: GradingSourceType;
+  context_type?: GradingContextType;
+  context_id?: string;
+  is_official?: boolean;
 }

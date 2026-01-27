@@ -82,33 +82,41 @@ export default function GradingResultsModal({
   const isCompleted = currentGrading.status === 'completed';
 
   // Determine if user can delete this grading:
-  // - Audio owner can delete any grading on their presentation
   // - Grading creator can delete their own grading
+  // - Audio owner can ONLY delete self-gradings, NOT instructor/official gradings
   const isAudioOwner = currentUserId && currentGrading.audioOwnerId 
     ? currentUserId === currentGrading.audioOwnerId 
     : false;
   const isGradingCreator = currentUserId && currentGrading.gradedByUserId
     ? currentUserId === currentGrading.gradedByUserId
     : false;
-  const canDelete = isAudioOwner || isGradingCreator || !currentUserId; // default to true if no user info
+  const isInstructorGrading = currentGrading.sourceType === 'instructor' || currentGrading.isOfficial;
+  
+  // Students (audio owners who didn't create the grading) cannot delete instructor gradings
+  const canDelete = isGradingCreator || 
+    (isAudioOwner && !isInstructorGrading) || 
+    (!currentUserId && !isInstructorGrading); // default behavior for missing user info
 
-  // Determine graded-by label
+  // Determine graded-by label based on sourceType
   const getGradedByLabel = () => {
-    if (!currentGrading.gradedByUserId) return null;
-    
-    // If graded by someone else (not the audio owner)
-    if (currentGrading.audioOwnerId && currentGrading.gradedByUserId !== currentGrading.audioOwnerId) {
-      if (currentGrading.gradedByRole === 'instructor') {
-        return 'Graded by instructor';
-      }
-      return `Graded by ${currentGrading.gradedByName || 'another user'}`;
+    if (currentGrading.sourceType === 'instructor') {
+      return currentGrading.gradedByName 
+        ? `Graded by ${currentGrading.gradedByName} (Instructor)`
+        : 'Graded by Instructor';
     }
-    
-    // Graded by owner
     return 'Self-graded';
   };
 
+  // Get context label
+  const getContextLabel = () => {
+    if (currentGrading.contextType === 'class') {
+      return currentGrading.contextName || 'Class Assignment';
+    }
+    return 'Practice';
+  };
+
   const gradedByLabel = getGradedByLabel();
+  const contextLabel = getContextLabel();
 
   // Safe getters for scores
   const overallScore = currentGrading.overallScore ?? 0;
@@ -153,11 +161,14 @@ export default function GradingResultsModal({
             {currentGrading.rubricName && gradings.length === 1 && (
               <p className="grading-rubric-name">Using: {currentGrading.rubricName}</p>
             )}
-            {gradedByLabel && isCompleted && (
-              <span className={`graded-by-badge ${currentGrading.gradedByRole === 'instructor' && currentGrading.gradedByUserId !== currentGrading.audioOwnerId ? 'instructor' : ''}`}>
+            <div className="grading-context-badges">
+              <span className={`graded-by-badge ${currentGrading.sourceType === 'instructor' ? 'instructor' : 'self'}`}>
                 {gradedByLabel}
               </span>
-            )}
+              <span className={`context-badge ${currentGrading.contextType === 'class' ? 'class' : 'practice'}`}>
+                {contextLabel}
+              </span>
+            </div>
           </div>
         </header>
 

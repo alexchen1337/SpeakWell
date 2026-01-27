@@ -45,11 +45,24 @@ def extract_audio_duration(file_contents: bytes, filename: str) -> Optional[int]
         return None
     
     try:
-        audio_file = MutagenFile(io.BytesIO(file_contents), easy=True)
-        if audio_file and hasattr(audio_file.info, "length"):
-            return int(audio_file.info.length)
+        # Try without easy=True first for better format support
+        audio_file = MutagenFile(io.BytesIO(file_contents))
+        if audio_file and hasattr(audio_file, 'info') and hasattr(audio_file.info, "length"):
+            duration = int(audio_file.info.length)
+            if duration > 0:
+                return duration
     except Exception:
-        return None
+        pass
+    
+    # Fallback: try with easy=True for some formats
+    try:
+        audio_file = MutagenFile(io.BytesIO(file_contents), easy=True)
+        if audio_file and hasattr(audio_file, 'info') and hasattr(audio_file.info, "length"):
+            duration = int(audio_file.info.length)
+            if duration > 0:
+                return duration
+    except Exception:
+        pass
     
     return None
 
@@ -388,6 +401,32 @@ async def update_audio(
         "uploadedAt": audio.created_at.isoformat(),
         "updatedAt": audio.updated_at.isoformat(),
     }
+
+
+@router.patch("/{audio_id}/duration")
+async def update_audio_duration(
+    audio_id: str,
+    duration: int = Query(..., gt=0, description="Duration in seconds"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update audio file duration (used when browser calculates duration that mutagen missed)."""
+    audio = db.query(AudioFile).filter(AudioFile.id == audio_id).first()
+    
+    if not audio:
+        raise HTTPException(status_code=404, detail="Audio file not found")
+    
+    # Allow owner or instructor of the class to update
+    if not can_access_audio(audio, current_user, db):
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Only update if duration is currently null (don't overwrite existing)
+    if audio.duration is None:
+        audio.duration = duration
+        audio.updated_at = datetime.utcnow()
+        db.commit()
+    
+    return {"duration": audio.duration}
 
 
 @router.delete("/{audio_id}")

@@ -33,6 +33,10 @@ export interface ClassPresentation {
   latestGradingScore: number | null;
   gradedByUserId: string | null;
   gradedByRole: string | null;
+  // Grading context fields
+  sourceType: string | null;
+  contextType: string | null;
+  isOfficial: boolean | null;
 }
 
 export interface ClassGrading {
@@ -52,7 +56,24 @@ export interface ClassGrading {
   gradedByUserId: string | null;
   gradedByName: string | null;
   gradedByRole: string | null;
+  // Grading context fields
+  sourceType: string;
+  contextType: string;
+  isOfficial: boolean;
   createdAt: string;
+}
+
+export interface ClassStats {
+  totalPresentations: number;
+  gradedPresentations: number;
+  officialGradings: number;
+  averageScore: number | null;
+  scoreDistribution: {
+    '80-100': number;
+    '60-79': number;
+    '40-59': number;
+    '0-39': number;
+  };
 }
 
 export interface CreateClassRequest {

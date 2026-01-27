@@ -15,6 +15,7 @@ from database import (
     generate_join_code,
 )
 from auth import get_current_user
+from sqlalchemy import func
 
 router = APIRouter(prefix="/api/classes", tags=["classes"])
 
@@ -73,6 +74,10 @@ class PresentationResponse(BaseModel):
     latestGradingScore: Optional[float] = Field(alias="latestGradingScore")
     gradedByUserId: Optional[str] = Field(default=None, alias="gradedByUserId")
     gradedByRole: Optional[str] = Field(default=None, alias="gradedByRole")
+    # New grading context fields
+    sourceType: Optional[str] = Field(default=None, alias="sourceType")
+    contextType: Optional[str] = Field(default=None, alias="contextType")
+    isOfficial: Optional[bool] = Field(default=None, alias="isOfficial")
 
     class Config:
         from_attributes = True
@@ -96,7 +101,24 @@ class ClassGradingResponse(BaseModel):
     gradedByUserId: Optional[str] = Field(default=None, alias="gradedByUserId")
     gradedByName: Optional[str] = Field(default=None, alias="gradedByName")
     gradedByRole: Optional[str] = Field(default=None, alias="gradedByRole")
+    # Grading context fields
+    sourceType: str = Field(default="self", alias="sourceType")
+    contextType: str = Field(default="practice", alias="contextType")
+    isOfficial: bool = Field(default=False, alias="isOfficial")
     createdAt: str = Field(alias="createdAt")
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+
+class ClassStatsResponse(BaseModel):
+    """Summary statistics for a class."""
+    totalPresentations: int = Field(alias="totalPresentations")
+    gradedPresentations: int = Field(alias="gradedPresentations")
+    officialGradings: int = Field(alias="officialGradings")
+    averageScore: Optional[float] = Field(alias="averageScore")
+    scoreDistribution: dict = Field(alias="scoreDistribution")  # e.g. {"80-100": 5, "60-79": 3, ...}
 
     class Config:
         from_attributes = True
@@ -129,6 +151,34 @@ def require_student(user: User):
     """Raise 403 if user is not a student."""
     if user.role != "student":
         raise HTTPException(status_code=403, detail="Only students can perform this action")
+
+
+def is_instructor_for_class(user: User, class_id: str, db: Session) -> bool:
+    """Check if user is the instructor for a given class."""
+    if not class_id:
+        return False
+    classroom = db.query(Classroom).filter(Classroom.id == class_id).first()
+    return classroom is not None and classroom.instructor_id == user.id
+
+
+def is_student_in_class(user: User, class_id: str, db: Session) -> bool:
+    """Check if user is enrolled as a student in a given class."""
+    if not class_id:
+        return False
+    enrollment = (
+        db.query(Enrollment)
+        .filter(Enrollment.class_id == class_id, Enrollment.student_id == user.id)
+        .first()
+    )
+    return enrollment is not None
+
+
+def get_class_name(class_id: str, db: Session) -> Optional[str]:
+    """Get the name of a class by its ID."""
+    if not class_id:
+        return None
+    classroom = db.query(Classroom).filter(Classroom.id == class_id).first()
+    return classroom.name if classroom else None
 
 
 # ----- Instructor Endpoints -----
@@ -268,10 +318,18 @@ def list_class_presentations(
         # Get graded-by user info if there's a grading
         graded_by_user_id = None
         graded_by_role = None
-        if latest_grading and latest_grading.graded_by_user_id:
-            graded_by_user_id = latest_grading.graded_by_user_id
-            if latest_grading.graded_by:
-                graded_by_role = latest_grading.graded_by.role
+        source_type = None
+        context_type = None
+        is_official = None
+        if latest_grading:
+            if latest_grading.graded_by_user_id:
+                graded_by_user_id = latest_grading.graded_by_user_id
+                if latest_grading.graded_by:
+                    graded_by_role = latest_grading.graded_by.role
+            # Get grading context fields (now stored as strings)
+            source_type = latest_grading.source_type if latest_grading.source_type else "self"
+            context_type = latest_grading.context_type if latest_grading.context_type else "practice"
+            is_official = bool(latest_grading.is_official) if latest_grading.is_official is not None else False
 
         result.append(
             PresentationResponse(
@@ -290,6 +348,9 @@ def list_class_presentations(
                 latestGradingScore=latest_grading.overall_score if latest_grading else None,
                 gradedByUserId=graded_by_user_id,
                 gradedByRole=graded_by_role,
+                sourceType=source_type,
+                contextType=context_type,
+                isOfficial=is_official,
             )
         )
 
@@ -376,11 +437,99 @@ def list_class_gradings(
                 gradedByUserId=g.graded_by_user_id,
                 gradedByName=graded_by.name if graded_by else None,
                 gradedByRole=graded_by.role if graded_by else None,
+                sourceType=g.source_type if g.source_type else "self",
+                contextType=g.context_type if g.context_type else "practice",
+                isOfficial=bool(g.is_official) if g.is_official is not None else False,
                 createdAt=g.created_at.isoformat(),
             )
         )
 
     return result
+
+
+@router.get("/{class_id}/stats", response_model=ClassStatsResponse)
+def get_class_stats(
+    class_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get summary statistics for a class (instructor only).
+    Returns total presentations, graded count, official gradings count,
+    average score, and score distribution.
+    """
+    classroom = db.query(Classroom).filter(Classroom.id == class_id).first()
+    if not classroom:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    if classroom.instructor_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Get all audio files for this class
+    audio_files = db.query(AudioFile).filter(AudioFile.class_id == class_id).all()
+    total_presentations = len(audio_files)
+
+    if total_presentations == 0:
+        return ClassStatsResponse(
+            totalPresentations=0,
+            gradedPresentations=0,
+            officialGradings=0,
+            averageScore=None,
+            scoreDistribution={"80-100": 0, "60-79": 0, "40-59": 0, "0-39": 0}
+        )
+
+    audio_file_ids = [af.id for af in audio_files]
+
+    # Get transcripts for these audio files
+    transcripts = db.query(Transcript).filter(Transcript.audio_file_id.in_(audio_file_ids)).all()
+    transcript_ids = [t.id for t in transcripts]
+
+    if not transcript_ids:
+        return ClassStatsResponse(
+            totalPresentations=total_presentations,
+            gradedPresentations=0,
+            officialGradings=0,
+            averageScore=None,
+            scoreDistribution={"80-100": 0, "60-79": 0, "40-59": 0, "0-39": 0}
+        )
+
+    # Get completed gradings for these transcripts
+    from database import GradingStatus
+    completed_gradings = (
+        db.query(Grading)
+        .filter(
+            Grading.transcript_id.in_(transcript_ids),
+            Grading.status == GradingStatus.completed
+        )
+        .all()
+    )
+
+    graded_presentations = len(set(g.transcript_id for g in completed_gradings))
+    official_gradings = len([g for g in completed_gradings if g.is_official])
+
+    # Calculate average score and distribution
+    scores = [g.overall_score for g in completed_gradings if g.overall_score is not None]
+    average_score = sum(scores) / len(scores) if scores else None
+
+    # Score distribution
+    distribution = {"80-100": 0, "60-79": 0, "40-59": 0, "0-39": 0}
+    for score in scores:
+        if score >= 80:
+            distribution["80-100"] += 1
+        elif score >= 60:
+            distribution["60-79"] += 1
+        elif score >= 40:
+            distribution["40-59"] += 1
+        else:
+            distribution["0-39"] += 1
+
+    return ClassStatsResponse(
+        totalPresentations=total_presentations,
+        gradedPresentations=graded_presentations,
+        officialGradings=official_gradings,
+        averageScore=average_score,
+        scoreDistribution=distribution
+    )
 
 
 # ----- Student Endpoints -----

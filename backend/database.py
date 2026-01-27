@@ -63,6 +63,18 @@ class GradingStatus(enum.Enum):
     failed = "failed"
 
 
+class GradingSourceType(enum.Enum):
+    """Who initiated the AI grading - student (self) or instructor."""
+    self = "self"
+    instructor = "instructor"
+
+
+class GradingContextType(enum.Enum):
+    """The context of the grading - practice or class assignment."""
+    practice = "practice"
+    class_assignment = "class"
+
+
 class User(Base):
     __tablename__ = "users"
     
@@ -234,6 +246,13 @@ class Grading(Base):
     status = Column(SQLEnum(GradingStatus), nullable=False, default=GradingStatus.processing)
     overall_score = Column(Float, nullable=True)
     max_possible_score = Column(Float, nullable=True)
+
+    # Grading context fields - who initiated it and in what context
+    # Using String instead of SQLEnum for better database compatibility
+    source_type = Column(String(20), nullable=False, default="self", index=True)
+    context_type = Column(String(20), nullable=False, default="practice", index=True)
+    context_id = Column(String(36), nullable=True, index=True)  # class_id when context_type = "class"
+    is_official = Column(Integer, nullable=False, default=0)  # 0=False, 1=True (SQLite-friendly)
 
     # Pacing metrics
     pacing_wpm_avg = Column(Float, nullable=True)

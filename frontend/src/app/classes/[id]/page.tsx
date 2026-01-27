@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { classesAPI, audioAPI } from '@/services/api';
-import { Classroom, ClassPresentation, Student } from '@/types/classroom';
+import { Classroom, ClassPresentation, Student, ClassStats } from '@/types/classroom';
 
 export default function ClassDetailPage() {
   const router = useRouter();
@@ -15,6 +15,7 @@ export default function ClassDetailPage() {
   const [classroom, setClassroom] = useState<Classroom | null>(null);
   const [presentations, setPresentations] = useState<ClassPresentation[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [stats, setStats] = useState<ClassStats | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -41,8 +42,21 @@ export default function ClassDetailPage() {
       setPresentations(presData);
 
       if (isInstructor) {
-        const studentsData = await classesAPI.getStudents(classId);
-        setStudents(studentsData);
+        // Load students and stats separately to handle partial failures gracefully
+        try {
+          const studentsData = await classesAPI.getStudents(classId);
+          setStudents(studentsData);
+        } catch (e) {
+          console.error('Failed to load students:', e);
+        }
+        
+        try {
+          const statsData = await classesAPI.getStats(classId);
+          setStats(statsData);
+        } catch (e) {
+          console.error('Failed to load stats:', e);
+          // Stats are optional, don't show error
+        }
       }
     } catch (err: any) {
       if (err.response?.status === 403) {
@@ -103,6 +117,30 @@ export default function ClassDetailPage() {
       id: presentation.id,
       title: presentation.filename,
       filename: presentation.filename,
+      // Add class context for grading
+      classId: classId,
+      className: classroom?.name,
+      isClassSubmission: true,
+      // If instructor is viewing, they should be able to grade
+      isInstructorGrading: isInstructor,
+      studentId: isInstructor ? presentation.studentId : undefined,
+      studentName: isInstructor ? presentation.studentName : undefined,
+    }));
+    router.push('/player');
+  };
+
+  const handleGradePresentation = (e: React.MouseEvent, presentation: ClassPresentation) => {
+    e.stopPropagation();
+    // Store context indicating this is an instructor grading session
+    localStorage.setItem('currentAudio', JSON.stringify({
+      id: presentation.id,
+      title: presentation.filename,
+      filename: presentation.filename,
+      classId: classId,
+      className: classroom?.name,
+      isInstructorGrading: true,
+      studentId: presentation.studentId,
+      studentName: presentation.studentName,
     }));
     router.push('/player');
   };
@@ -160,17 +198,15 @@ export default function ClassDetailPage() {
   };
 
   const getGradingBadge = (presentation: ClassPresentation) => {
-    if (!presentation.latestGradingId) return null;
+    if (!presentation.latestGradingId) {
+      return <span className="grading-badge grading-pending">Not graded</span>;
+    }
     
     if (presentation.latestGradingStatus === 'completed' && presentation.latestGradingScore !== null) {
-      // Determine if graded by instructor (not by the student who owns it)
-      const isGradedByInstructor = presentation.gradedByRole === 'instructor' && 
-        presentation.gradedByUserId !== presentation.studentId;
-      
+      // In class view, all grades are from instructors (students can't self-grade class submissions)
       return (
         <span className="grading-badge grading-completed">
-          {presentation.latestGradingScore.toFixed(1)}
-          {isGradedByInstructor && <span className="graded-by-indicator"> (instructor)</span>}
+          {presentation.latestGradingScore.toFixed(0)}%
         </span>
       );
     } else if (presentation.latestGradingStatus === 'processing') {
@@ -272,27 +308,52 @@ export default function ClassDetailPage() {
         {/* Upload section for students */}
         {!isInstructor && (
           <div className="upload-section">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileSelect}
-              accept="audio/*"
-              multiple
-              style={{ display: 'none' }}
-              disabled={uploading}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="btn-primary upload-btn"
-              disabled={uploading}
-            >
-              {uploading ? `Uploading... ${uploadProgress}%` : '+ Upload Presentation'}
-            </button>
+            <div className="upload-section-content">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept="audio/*"
+                multiple
+                style={{ display: 'none' }}
+                disabled={uploading}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="btn-primary upload-btn"
+                disabled={uploading}
+              >
+                {uploading ? `Uploading... ${uploadProgress}%` : '+ Submit Presentation'}
+              </button>
+              <p className="upload-hint">
+                Submit your presentation for instructor review. To practice and grade yourself, upload to your Library instead.
+              </p>
+            </div>
             {uploading && (
               <div className="upload-progress-bar">
                 <div className="upload-progress-fill" style={{ width: `${uploadProgress}%` }}></div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Stats Summary for instructors */}
+        {isInstructor && stats && (
+          <div className="class-stats-summary">
+            <div className="stat-card">
+              <div className="stat-value">{stats.totalPresentations}</div>
+              <div className="stat-label">Submissions</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{stats.gradedPresentations}</div>
+              <div className="stat-label">Graded</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">
+                {stats.averageScore !== null ? `${stats.averageScore.toFixed(0)}%` : '—'}
+              </div>
+              <div className="stat-label">Avg Score</div>
+            </div>
           </div>
         )}
 
@@ -304,7 +365,7 @@ export default function ClassDetailPage() {
                 className={`tab-button ${activeTab === 'presentations' ? 'active' : ''}`}
                 onClick={() => setActiveTab('presentations')}
             >
-              Presentations ({presentations.length})
+              Submissions ({presentations.length})
             </button>
             <button
               className={`tab-button ${activeTab === 'students' ? 'active' : ''}`}
@@ -348,8 +409,9 @@ export default function ClassDetailPage() {
                       {isInstructor && <th>Student</th>}
                       <th>Duration</th>
                       <th>Status</th>
-                      <th>Grading</th>
+                      <th>Grade</th>
                       <th>Uploaded</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -367,8 +429,35 @@ export default function ClassDetailPage() {
                         )}
                         <td>{formatDuration(pres.duration)}</td>
                         <td>{getStatusBadge(pres.status)}</td>
-                        <td>{getGradingBadge(pres) || '—'}</td>
+                        <td>{getGradingBadge(pres)}</td>
                         <td className="presentation-date">{formatDate(pres.uploadedAt)}</td>
+                        <td className="presentation-actions" onClick={(e) => e.stopPropagation()}>
+                          {pres.status === 'completed' && (
+                            isInstructor ? (
+                              <button
+                                className="btn-small btn-primary"
+                                onClick={(e) => handleGradePresentation(e, pres)}
+                              >
+                                {pres.latestGradingId ? 'Re-grade' : 'Grade'}
+                              </button>
+                            ) : (
+                              // For students: show status based on whether graded or not
+                              pres.latestGradingId && pres.latestGradingStatus === 'completed' ? (
+                                <span className="graded-status">
+                                  ✓ Graded
+                                </span>
+                              ) : pres.latestGradingStatus === 'processing' ? (
+                                <span className="grading-in-progress">
+                                  Grading...
+                                </span>
+                              ) : (
+                                <span className="awaiting-grade">
+                                  Awaiting Grade
+                                </span>
+                              )
+                            )
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

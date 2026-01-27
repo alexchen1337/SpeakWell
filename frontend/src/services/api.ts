@@ -1,7 +1,8 @@
 import axios from 'axios';
 import { AudioFile, TranscriptResponse } from '@/types/audio';
 import { Rubric, RubricCreateRequest, RubricUpdateRequest, Grading, GradingInitiateRequest } from '@/types/grading';
-import { Classroom, Student, ClassPresentation, ClassGrading, CreateClassRequest, JoinClassRequest } from '@/types/classroom';
+import { Classroom, Student, ClassPresentation, ClassGrading, ClassStats, CreateClassRequest, JoinClassRequest } from '@/types/classroom';
+import { GradingSourceType, GradingContextType } from '@/types/grading';
 import { API_URL } from '@/config';
 
 const API_BASE_URL = API_URL;
@@ -102,6 +103,13 @@ export const audioAPI = {
     const audio = await axiosInstance.get(`/api/audio/${id}`);
     return { url: audio.data.url };
   },
+
+  updateDuration: async (id: string, duration: number): Promise<{ duration: number }> => {
+    const response = await axiosInstance.patch(`/api/audio/${id}/duration`, null, {
+      params: { duration: Math.round(duration) }
+    });
+    return response.data;
+  },
 };
 
 export const transcriptAPI = {
@@ -154,6 +162,13 @@ export const rubricAPI = {
   },
 };
 
+export interface GradingFilters {
+  sourceType?: GradingSourceType;
+  contextType?: GradingContextType;
+  classId?: string;
+  onlyOfficial?: boolean;
+}
+
 export const gradingAPI = {
   initiate: async (data: GradingInitiateRequest, replaceExisting: boolean = false): Promise<Grading> => {
     const response = await axiosInstance.post('/api/gradings', data, {
@@ -162,8 +177,14 @@ export const gradingAPI = {
     return response.data;
   },
 
-  listAll: async (): Promise<Grading[]> => {
-    const response = await axiosInstance.get('/api/gradings/all');
+  listAll: async (filters?: GradingFilters): Promise<Grading[]> => {
+    const params: Record<string, string | boolean> = {};
+    if (filters?.sourceType) params.source_type = filters.sourceType;
+    if (filters?.contextType) params.context_type = filters.contextType;
+    if (filters?.classId) params.class_id = filters.classId;
+    if (filters?.onlyOfficial !== undefined) params.only_official = filters.onlyOfficial;
+    
+    const response = await axiosInstance.get('/api/gradings/all', { params });
     return response.data;
   },
 
@@ -201,6 +222,11 @@ export const classesAPI = {
 
   getGradings: async (classId: string): Promise<ClassGrading[]> => {
     const response = await axiosInstance.get(`/api/classes/${classId}/gradings`);
+    return response.data;
+  },
+
+  getStats: async (classId: string): Promise<ClassStats> => {
+    const response = await axiosInstance.get(`/api/classes/${classId}/stats`);
     return response.data;
   },
 

@@ -789,6 +789,13 @@
   margin: 0;
 }
 
+.grading-context-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .graded-by-badge {
   display: inline-flex;
   align-items: center;
@@ -802,9 +809,48 @@
 }
 
 .graded-by-badge.instructor {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+  border: 1px solid rgba(37, 99, 235, 0.3);
+}
+
+.graded-by-badge.self {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.context-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 12px;
+}
+
+.context-badge.practice {
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+  border: 1px solid rgba(45, 122, 62, 0.3);
+}
+
+.context-badge.class {
   background: var(--color-accent-subtle);
   color: var(--color-accent);
-  border-color: var(--color-accent);
+  border: 1px solid var(--color-accent-border);
+}
+
+.official-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 12px;
+  background: rgba(139, 92, 246, 0.1);
+  color: #7c3aed;
+  border: 1px solid rgba(139, 92, 246, 0.3);
 }
 
 /* Footer hint for non-owners */
