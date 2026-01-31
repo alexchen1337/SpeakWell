@@ -13,3 +13,6 @@ mutagen==1.47.0
 supabase>=2.0.0
 openai>=1.30.0
 
+# Security dependencies
+pyJWT>=2.8.0
+cryptography>=41.0.0
