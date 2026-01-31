@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 from database import get_db, User, AudioFile, AudioStatus
 from auth import get_current_user
+from security import FileValidator
 
 ROOT_ENV = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=ROOT_ENV)
@@ -135,24 +136,7 @@ async def upload_audio(
     for file in audio:
         object_key = None
         try:
-            if not file.content_type or not file.content_type.startswith("audio/"):
-                failed_files.append({
-                    "filename": file.filename,
-                    "error": "Not an audio file"
-                })
-                continue
-            
-            if file.size and file.size > 100 * 1024 * 1024:
-                failed_files.append({
-                    "filename": file.filename,
-                    "error": "File too large (max 100MB)"
-                })
-                continue
-            
-            file_id = str(uuid.uuid4())
-            file_extension = os.path.splitext(file.filename)[1]
-            object_key = f"{current_user.id}/{file_id}{file_extension}"
-            
+            # Read file contents for validation
             contents = await file.read()
             if not contents:
                 failed_files.append({
@@ -161,20 +145,44 @@ async def upload_audio(
                 })
                 continue
             
+            # SECURITY: Comprehensive file validation
+            try:
+                sanitized_filename, validated_mime_type = FileValidator.validate_audio_file(
+                    file,
+                    contents
+                )
+            except HTTPException as e:
+                failed_files.append({
+                    "filename": file.filename,
+                    "error": e.detail
+                })
+                continue
+            
+            # SECURITY: Validate file size
+            file_size = len(contents)
+            FileValidator.validate_file_size_streaming(file_size)
+            
+            file_id = str(uuid.uuid4())
+            file_extension = os.path.splitext(sanitized_filename)[1]
+            
+            # SECURITY: Sanitize object key path to prevent path traversal
+            # Ensure user_id doesn't contain path traversal characters
+            safe_user_id = current_user.id.replace("..", "").replace("/", "").replace("\\", "")
+            object_key = f"{safe_user_id}/{file_id}{file_extension}"
+            
             storage_client.storage.from_(STORAGE_BUCKET).upload(
                 path=object_key,
                 file=contents,
                 file_options={
-                    "content-type": file.content_type,
+                    "content-type": validated_mime_type,  # Use validated MIME type
                     "cache-control": "public, max-age=31536000",
                 }
             )
             
-            file_size = len(contents)
-            duration = extract_audio_duration(contents, file.filename)
+            duration = extract_audio_duration(contents, sanitized_filename)
             
             # Generate unique filename if duplicate exists
-            unique_filename = get_unique_filename(db, current_user.id, file.filename)
+            unique_filename = get_unique_filename(db, current_user.id, sanitized_filename)
             
             audio_file = AudioFile(
                 id=file_id,
@@ -214,6 +222,9 @@ async def upload_audio(
                 "uploadedAt": audio_file.created_at.isoformat(),
             })
             
+        except HTTPException:
+            # Re-raise HTTP exceptions (already properly formatted)
+            raise
         except Exception as e:
             db.rollback()
             failed_files.append({
@@ -317,7 +328,8 @@ async def update_audio(
     if not title or not title.strip():
         raise HTTPException(status_code=400, detail="Title cannot be empty")
     
-    clean_title = title.strip()
+    # SECURITY: Sanitize the title to prevent path traversal
+    clean_title = FileValidator.sanitize_filename(title.strip())
     
     # Check for duplicate name (excluding current file)
     existing = db.query(AudioFile).filter(
