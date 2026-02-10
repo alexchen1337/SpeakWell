@@ -12,6 +12,7 @@ from database import (
     AudioFile,
     Transcript,
     Grading,
+    GradingStatus,
     generate_join_code,
 )
 from auth import get_current_user
@@ -308,12 +309,42 @@ def list_class_presentations(
         transcript = db.query(Transcript).filter(Transcript.audio_file_id == af.id).first()
         latest_grading = None
         if transcript:
-            latest_grading = (
-                db.query(Grading)
-                .filter(Grading.transcript_id == transcript.id)
-                .order_by(Grading.created_at.desc())
-                .first()
-            )
+            if is_instructor:
+                # Instructors should ONLY see official grades, never practice grades
+                # is_official is stored as Integer (0=False, 1=True)
+                # Also filter by status to only show completed gradings
+                latest_grading = (
+                    db.query(Grading)
+                    .filter(
+                        Grading.transcript_id == transcript.id,
+                        Grading.is_official == 1,  # Only official grades for instructors
+                        Grading.status == GradingStatus.completed  # Only completed gradings
+                    )
+                    .order_by(Grading.created_at.desc())
+                    .first()
+                )
+            else:
+                # Students can see all their gradings, but prioritize official if available
+                official_grading = (
+                    db.query(Grading)
+                    .filter(
+                        Grading.transcript_id == transcript.id,
+                        Grading.is_official == 1
+                    )
+                    .order_by(Grading.created_at.desc())
+                    .first()
+                )
+                
+                if official_grading:
+                    latest_grading = official_grading
+                else:
+                    # If no official grading exists, get the latest grading (could be practice)
+                    latest_grading = (
+                        db.query(Grading)
+                        .filter(Grading.transcript_id == transcript.id)
+                        .order_by(Grading.created_at.desc())
+                        .first()
+                    )
 
         # Get graded-by user info if there's a grading
         graded_by_user_id = None
@@ -390,9 +421,13 @@ def list_class_gradings(
         return []
 
     # Get all gradings for these transcripts
+    # Instructors should only see official grades, not student practice grades
     gradings = (
         db.query(Grading)
-        .filter(Grading.transcript_id.in_(transcript_ids))
+        .filter(
+            Grading.transcript_id.in_(transcript_ids),
+            Grading.is_official == 1  # Only show official grades to instructors
+        )
         .order_by(Grading.created_at.desc())
         .all()
     )
@@ -494,20 +529,22 @@ def get_class_stats(
         )
 
     # Get completed gradings for these transcripts
+    # Only use official grades for stats (instructors shouldn't see practice grades)
     from database import GradingStatus
     completed_gradings = (
         db.query(Grading)
         .filter(
             Grading.transcript_id.in_(transcript_ids),
-            Grading.status == GradingStatus.completed
+            Grading.status == GradingStatus.completed,
+            Grading.is_official == 1  # Only official grades for stats
         )
         .all()
     )
 
     graded_presentations = len(set(g.transcript_id for g in completed_gradings))
-    official_gradings = len([g for g in completed_gradings if g.is_official])
+    official_gradings = len(completed_gradings)  # All are official now
 
-    # Calculate average score and distribution
+    # Calculate average score and distribution (only from official grades)
     scores = [g.overall_score for g in completed_gradings if g.overall_score is not None]
     average_score = sum(scores) / len(scores) if scores else None
 

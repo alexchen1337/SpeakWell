@@ -238,6 +238,20 @@ export default function PlayerPage() {
   };
 
   const handleBack = () => {
+    // Check if we came from a class page
+    const storedAudio = localStorage.getItem('currentAudio');
+    if (storedAudio) {
+      try {
+        const audioData = JSON.parse(storedAudio);
+        if (audioData.classId) {
+          // If we came from a class, go back to that class page
+          router.push(`/classes/${audioData.classId}`);
+          return;
+        }
+      } catch {
+        // If parsing fails, just go to library
+      }
+    }
     router.push('/library');
   };
 
@@ -255,9 +269,11 @@ export default function PlayerPage() {
       
       setGradings(prev => [...prev, newGrading]);
       startGradingPolling(transcriptId);
-    } catch (err) {
+    } catch (err: any) {
       setGradingInProgress(false);
-      console.error('Failed to initiate grading:', err);
+      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to initiate grading';
+      console.error('Failed to initiate grading:', errorMessage, err);
+      alert(`Error: ${errorMessage}`); // Temporary - show error to user
     }
   };
 
@@ -403,23 +419,14 @@ export default function PlayerPage() {
                   View Grading ({completedGradings.length})
                 </button>
               )}
-              {isStudentClassSubmission ? (
-                <button 
-                  className="btn-disabled btn-small"
-                  disabled
-                  title="Only your instructor can grade class submissions. Upload to your Library for self-practice."
-                >
-                  Awaiting Instructor Grade
-                </button>
-              ) : (
-                <button 
-                  className="btn-primary btn-small"
-                  onClick={() => setShowRubricSelector(true)}
-                  disabled={gradingInProgress}
-                >
-                  Grade Presentation
-                </button>
-              )}
+              <button 
+                className="btn-primary btn-small"
+                onClick={() => setShowRubricSelector(true)}
+                disabled={gradingInProgress}
+                title={isStudentClassSubmission ? "Practice self-grading. Your instructor's grade (if available) is the official grade." : undefined}
+              >
+                {isStudentClassSubmission ? "Practice Grade" : "Grade Presentation"}
+              </button>
             </>
           )}
           <div className="player-file-size">

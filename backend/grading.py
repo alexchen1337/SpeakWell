@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 import uuid
 
 from database import (
-    get_db, SessionLocal, User, Transcript, Rubric, Grading, GradingStatus, 
+    get_db, SessionLocal, User, Transcript, Rubric, RubricType, Grading, GradingStatus, 
     AudioFile, Classroom
 )
 from auth import get_current_user
@@ -170,15 +170,14 @@ def initiate_grading(
         raise HTTPException(status_code=404, detail="Audio file not found")
     
     if not can_access_audio(audio_file, current_user, db):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    # Prevent students from self-grading class submissions
-    # They should use their personal library for practice grading
-    if audio_file.class_id and audio_file.user_id == current_user.id:
         raise HTTPException(
             status_code=403, 
-            detail="Cannot self-grade class submissions. Upload to your personal library for practice grading."
+            detail="Access denied to audio file. You must be the owner or an instructor of the class."
         )
+
+    # Note: Students can now self-grade class submissions for practice
+    # Their self-grades will be marked as "practice" context
+    # Instructor grades will be marked as "official" and "class" context
 
     # Verify rubric exists and user has access
     rubric = db.query(Rubric).filter(Rubric.id == request.rubric_id).first()
@@ -186,8 +185,21 @@ def initiate_grading(
         raise HTTPException(status_code=404, detail="Rubric not found")
 
     # Check rubric access (built-in or user's custom)
-    if rubric.rubric_type.value == "custom" and rubric.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Access denied to rubric")
+    # Built-in rubrics are accessible to everyone
+    # Custom rubrics must belong to the current user
+    if rubric.rubric_type == RubricType.custom:
+        if rubric.user_id is None:
+            print(f"ERROR: Custom rubric {rubric.id} has None user_id")
+            raise HTTPException(
+                status_code=500, 
+                detail="Rubric data error: custom rubric missing user_id"
+            )
+        if rubric.user_id != current_user.id:
+            print(f"ERROR: Rubric user_id mismatch. Rubric user_id: {rubric.user_id}, Current user_id: {current_user.id}")
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Access denied to rubric. This rubric belongs to another user. (Rubric owner: {rubric.user_id}, Your ID: {current_user.id})"
+            )
 
     # Determine grading context (using string values for database compatibility)
     source_type = "self"
@@ -229,6 +241,7 @@ def initiate_grading(
     
     # Auto-detect: If user is an instructor grading a student's class presentation
     # Automatically mark as official since instructor grades are the "real" grades
+    # Note: Students self-grading their own class submissions will remain as "practice" context
     if audio_file.class_id and audio_file.user_id != current_user.id:
         if is_instructor_for_class(current_user, audio_file.class_id, db):
             source_type = "instructor"
@@ -236,6 +249,13 @@ def initiate_grading(
             context_id = audio_file.class_id
             context_name = get_class_name(audio_file.class_id, db)
             is_official = True  # Instructor grades are automatically official
+    
+    # If student is self-grading their own class submission, ensure it's marked as practice
+    # (This is already the default, but we make it explicit)
+    if audio_file.class_id and audio_file.user_id == current_user.id and source_type == "self":
+        context_type = "practice"  # Student self-grades are always practice, even for class submissions
+        context_id = None  # Don't link practice grades to class context
+        is_official = False
 
     # If replace_existing, find and reuse existing grading for this transcript+rubric
     existing_grading = None
@@ -336,7 +356,24 @@ def list_transcript_gradings(
     if not can_access_audio(audio_file, current_user, db):
         raise HTTPException(status_code=403, detail="Access denied")
 
-    gradings = db.query(Grading).filter(Grading.transcript_id == transcript_id).all()
+    # Filter gradings based on who is viewing:
+    # - Students can see all their gradings (including practice)
+    # - Instructors can only see official grades (not student practice grades)
+    is_instructor_viewing_student = (
+        audio_file.class_id and 
+        audio_file.user_id != current_user.id and
+        is_instructor_for_class(current_user, audio_file.class_id, db)
+    )
+    
+    if is_instructor_viewing_student:
+        # Instructor viewing student's work - only show official grades
+        gradings = db.query(Grading).filter(
+            Grading.transcript_id == transcript_id,
+            Grading.is_official == 1
+        ).all()
+    else:
+        # Student viewing their own work - show all gradings
+        gradings = db.query(Grading).filter(Grading.transcript_id == transcript_id).all()
 
     # Build rubric name lookup
     rubric_ids = [g.rubric_id for g in gradings if g.rubric_id]

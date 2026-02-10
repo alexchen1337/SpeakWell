@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from typing import List, Optional
-from pydantic import BaseModel, Field, field_validator
+from typing import List, Optional, Annotated, Union
+from pydantic import BaseModel, Field, BeforeValidator
 import uuid
 
 from database import get_db, User, Rubric, RubricCriterion, RubricType
@@ -10,25 +10,36 @@ from auth import get_current_user
 router = APIRouter(prefix="/api/rubrics", tags=["rubrics"])
 
 
+def coerce_to_float(v: Union[int, float, str]) -> float:
+    """Coerce input to float, accepting both int and float."""
+    if isinstance(v, (int, float)):
+        result = float(v)
+        if result <= 0:
+            raise ValueError('Must be a positive number')
+        return result
+    if isinstance(v, str):
+        try:
+            result = float(v)
+            if result <= 0:
+                raise ValueError('Must be a positive number')
+            return result
+        except ValueError as e:
+            if 'positive' in str(e):
+                raise
+            raise ValueError('Must be a valid number')
+    raise ValueError('Must be a number')
+
+
+# Use Annotated with BeforeValidator for Pydantic v2
+# This ensures integers are converted to floats before validation
+PositiveFloat = Annotated[float, BeforeValidator(coerce_to_float)]
+
+
 class CriterionRequest(BaseModel):
     name: str = Field(..., max_length=255)
     description: str
-    max_score: int = Field(..., gt=0)
-    weight: float = Field(..., gt=0)
-
-    @field_validator('max_score')
-    @classmethod
-    def validate_max_score(cls, v):
-        if v <= 0:
-            raise ValueError('Max score must be a positive number')
-        return v
-
-    @field_validator('weight')
-    @classmethod
-    def validate_weight(cls, v):
-        if v <= 0:
-            raise ValueError('Weight must be a positive number')
-        return v
+    max_score: PositiveFloat = Field(..., gt=0)
+    weight: PositiveFloat = Field(..., gt=0)
 
 
 class RubricCreateRequest(BaseModel):
@@ -47,7 +58,7 @@ class CriterionResponse(BaseModel):
     id: str
     name: str
     description: str
-    maxScore: int = Field(alias="maxScore")
+    maxScore: float = Field(alias="maxScore")
     weight: float
     orderIndex: int = Field(alias="orderIndex")
 
@@ -134,6 +145,11 @@ def create_rubric(
     db: Session = Depends(get_db)
 ):
     """Create a custom rubric."""
+    # Validate rubric weights
+    total_weight = sum(c.weight for c in request.criteria)
+    if total_weight <= 0:
+        raise HTTPException(status_code=400, detail="Total weight must be greater than 0")
+    
     rubric_id = str(uuid.uuid4())
 
     rubric = Rubric(
@@ -193,6 +209,11 @@ def update_rubric(
 
     # Update criteria if provided
     if request.criteria is not None:
+        # Validate rubric weights
+        total_weight = sum(c.weight for c in request.criteria)
+        if total_weight <= 0:
+            raise HTTPException(status_code=400, detail="Total weight must be greater than 0")
+        
         # Delete old criteria
         db.query(RubricCriterion).filter(RubricCriterion.rubric_id == rubric_id).delete()
 

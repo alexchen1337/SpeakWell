@@ -30,14 +30,64 @@ export default function RubricEditorModal({ rubric, onSave, onCancel }: RubricEd
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [weightWarning, setWeightWarning] = useState<string | null>(null);
+  // Store raw string values for decimal inputs to preserve decimal points while typing
+  const [maxScoreInputs, setMaxScoreInputs] = useState<{ [key: number]: string }>({});
+  const [weightInputs, setWeightInputs] = useState<{ [key: number]: string }>({});
+  
+  // Initialize input strings from initial criteria (only on mount)
+  useEffect(() => {
+    const maxScoreStrings: { [key: number]: string } = {};
+    const weightStrings: { [key: number]: string } = {};
+    criteria.forEach((c, idx) => {
+      maxScoreStrings[idx] = String(c.maxScore);
+      weightStrings[idx] = String(c.weight);
+    });
+    setMaxScoreInputs(maxScoreStrings);
+    setWeightInputs(weightStrings);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
 
   const handleAddCriterion = () => {
+    const newIndex = criteria.length;
     setCriteria([...criteria, { name: '', description: '', maxScore: 5, weight: 1 }]);
+    setMaxScoreInputs(prev => ({ ...prev, [newIndex]: '5' }));
+    setWeightInputs(prev => ({ ...prev, [newIndex]: '1' }));
   };
 
   const handleRemoveCriterion = (index: number) => {
     if (criteria.length > 1) {
       setCriteria(criteria.filter((_, i) => i !== index));
+      // Clean up input strings
+      setMaxScoreInputs(prev => {
+        const next = { ...prev };
+        delete next[index];
+        // Reindex remaining entries
+        const reindexed: { [key: number]: string } = {};
+        Object.keys(next).forEach(key => {
+          const oldIdx = parseInt(key);
+          if (oldIdx > index) {
+            reindexed[oldIdx - 1] = next[oldIdx];
+          } else if (oldIdx < index) {
+            reindexed[oldIdx] = next[oldIdx];
+          }
+        });
+        return reindexed;
+      });
+      setWeightInputs(prev => {
+        const next = { ...prev };
+        delete next[index];
+        const reindexed: { [key: number]: string } = {};
+        Object.keys(next).forEach(key => {
+          const oldIdx = parseInt(key);
+          if (oldIdx > index) {
+            reindexed[oldIdx - 1] = next[oldIdx];
+          } else if (oldIdx < index) {
+            reindexed[oldIdx] = next[oldIdx];
+          }
+        });
+        return reindexed;
+      });
     }
   };
 
@@ -55,7 +105,34 @@ export default function RubricEditorModal({ rubric, onSave, onCancel }: RubricEd
         return next;
       });
     }
+    
+    // Validate weights when weight changes
+    if (field === 'weight') {
+      validateWeights(updated);
+    }
   };
+  
+  const validateWeights = (criteriaList: RubricCriterionRequest[]) => {
+    const totalWeight = criteriaList.reduce((sum, c) => sum + (c.weight || 0), 0);
+    
+    // Common weight totals: 1.0, 10.0, 100.0, or number of criteria
+    const commonTotals = [1.0, 10.0, 100.0, criteriaList.length];
+    const isCommonTotal = commonTotals.some(total => Math.abs(totalWeight - total) < 0.01);
+    
+    if (totalWeight <= 0) {
+      setWeightWarning('Total weight must be greater than 0');
+    } else if (!isCommonTotal && criteriaList.length > 0) {
+      setWeightWarning(`Total weight is ${totalWeight.toFixed(2)}. Common values are 1.0, 10.0, 100.0, or ${criteriaList.length} (number of criteria).`);
+    } else {
+      setWeightWarning(null);
+    }
+  };
+  
+  useEffect(() => {
+    // Validate weights when criteria count changes (e.g., adding/removing criteria)
+    validateWeights(criteria);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [criteria.length]);
 
   const validatePositiveNumber = (value: number, index: number, field: 'maxScore' | 'weight'): boolean => {
     const errorKey = `${index}-${field}`;
@@ -107,6 +184,13 @@ export default function RubricEditorModal({ rubric, onSave, onCancel }: RubricEd
 
     if (hasErrors) {
       setFieldErrors(newFieldErrors);
+      return;
+    }
+    
+    // Validate total weight
+    const totalWeight = criteria.reduce((sum, c) => sum + c.weight, 0);
+    if (totalWeight <= 0) {
+      setError('Total weight must be greater than 0');
       return;
     }
 
@@ -224,18 +308,38 @@ export default function RubricEditorModal({ rubric, onSave, onCancel }: RubricEd
                       <input
                         id={`criterion-maxscore-${index}`}
                         type="text"
-                        inputMode="numeric"
-                        value={criterion.maxScore}
+                        inputMode="decimal"
+                        value={maxScoreInputs[index] ?? String(criterion.maxScore)}
                         onChange={(e) => {
                           const val = e.target.value;
-                          // Allow empty string or valid numbers
-                          if (val === '' || /^\d+$/.test(val)) {
-                            handleCriterionChange(index, 'maxScore', val === '' ? 0 : parseInt(val));
+                          // Allow empty string, numbers, and decimal point
+                          if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                            // Store the raw string value
+                            setMaxScoreInputs(prev => ({ ...prev, [index]: val }));
+                            // Update the numeric value for validation
+                            const numValue = val === '' || val === '.' ? 0 : parseFloat(val);
+                            if (!isNaN(numValue)) {
+                              handleCriterionChange(index, 'maxScore', numValue);
+                            }
                           }
                         }}
-                        onBlur={() => validatePositiveNumber(criterion.maxScore, index, 'maxScore')}
+                        onBlur={() => {
+                          // Ensure we have a valid number on blur
+                          const currentInput = maxScoreInputs[index] ?? String(criterion.maxScore);
+                          const numValue = currentInput === '' || currentInput === '.' ? 0 : parseFloat(currentInput);
+                          if (isNaN(numValue) || numValue <= 0) {
+                            // Reset to previous valid value
+                            setMaxScoreInputs(prev => ({ ...prev, [index]: String(criterion.maxScore) }));
+                          } else {
+                            // Normalize the display (remove trailing decimal if whole number)
+                            const normalized = numValue % 1 === 0 ? String(numValue) : String(numValue);
+                            setMaxScoreInputs(prev => ({ ...prev, [index]: normalized }));
+                            handleCriterionChange(index, 'maxScore', numValue);
+                          }
+                          validatePositiveNumber(criterion.maxScore, index, 'maxScore');
+                        }}
                         className={fieldErrors[`${index}-maxScore`] ? 'input-error' : ''}
-                        placeholder="e.g., 10"
+                        placeholder="e.g., 10.0"
                         required
                       />
                       {fieldErrors[`${index}-maxScore`] && (
@@ -249,15 +353,36 @@ export default function RubricEditorModal({ rubric, onSave, onCancel }: RubricEd
                         id={`criterion-weight-${index}`}
                         type="text"
                         inputMode="decimal"
-                        value={criterion.weight}
+                        value={weightInputs[index] ?? String(criterion.weight)}
                         onChange={(e) => {
                           const val = e.target.value;
                           // Allow empty string, numbers, and decimal point
                           if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                            handleCriterionChange(index, 'weight', val === '' ? 0 : parseFloat(val) || 0);
+                            // Store the raw string value
+                            setWeightInputs(prev => ({ ...prev, [index]: val }));
+                            // Update the numeric value for validation
+                            const numValue = val === '' || val === '.' ? 0 : parseFloat(val);
+                            if (!isNaN(numValue)) {
+                              handleCriterionChange(index, 'weight', numValue);
+                            }
                           }
                         }}
-                        onBlur={() => validatePositiveNumber(criterion.weight, index, 'weight')}
+                        onBlur={() => {
+                          // Ensure we have a valid number on blur
+                          const currentInput = weightInputs[index] ?? String(criterion.weight);
+                          const numValue = currentInput === '' || currentInput === '.' ? 0 : parseFloat(currentInput);
+                          if (isNaN(numValue) || numValue <= 0) {
+                            // Reset to previous valid value
+                            setWeightInputs(prev => ({ ...prev, [index]: String(criterion.weight) }));
+                          } else {
+                            // Normalize the display (remove trailing decimal if whole number)
+                            const normalized = numValue % 1 === 0 ? String(numValue) : String(numValue);
+                            setWeightInputs(prev => ({ ...prev, [index]: normalized }));
+                            handleCriterionChange(index, 'weight', numValue);
+                          }
+                          validatePositiveNumber(criterion.weight, index, 'weight');
+                          validateWeights(criteria);
+                        }}
                         className={fieldErrors[`${index}-weight`] ? 'input-error' : ''}
                         placeholder="e.g., 1.0"
                         required
@@ -269,6 +394,21 @@ export default function RubricEditorModal({ rubric, onSave, onCancel }: RubricEd
                   </div>
                 </div>
               ))}
+            </div>
+            
+            {/* Weight validation summary */}
+            <div className="weight-summary">
+              <div className="weight-total">
+                <strong>Total Weight:</strong> {criteria.reduce((sum, c) => sum + (c.weight || 0), 0).toFixed(2)}
+              </div>
+              {weightWarning && (
+                <div className="weight-warning">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} style={{ width: '16px', height: '16px', flexShrink: 0 }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                  </svg>
+                  <span>{weightWarning}</span>
+                </div>
+              )}
             </div>
           </div>
 

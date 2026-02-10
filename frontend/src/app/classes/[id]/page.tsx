@@ -83,6 +83,7 @@ export default function ClassDetailPage() {
     }
   }, [isAuthenticated, classId, loadData]);
 
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -203,7 +204,13 @@ export default function ClassDetailPage() {
     }
     
     if (presentation.latestGradingStatus === 'completed' && presentation.latestGradingScore !== null) {
-      // In class view, all grades are from instructors (students can't self-grade class submissions)
+      // For students: only show score if it's an official instructor grade
+      // For instructors: backend already filters to only show official grades
+      if (!isInstructor && presentation.isOfficial !== true) {
+        return <span className="grading-badge grading-pending">Not graded</span>;
+      }
+      // In class view, we show the official instructor grade (prioritized by backend)
+      // Practice self-grades are not shown here, only official grades
       return (
         <span className="grading-badge grading-completed">
           {presentation.latestGradingScore.toFixed(0)}%
@@ -441,8 +448,9 @@ export default function ClassDetailPage() {
                                 {pres.latestGradingId ? 'Re-grade' : 'Grade'}
                               </button>
                             ) : (
-                              // For students: show status based on whether graded or not
-                              pres.latestGradingId && pres.latestGradingStatus === 'completed' ? (
+                              // For students: show status based on whether officially graded by instructor
+                              // Only show "Graded" if there's an official instructor grade
+                              pres.latestGradingId && pres.latestGradingStatus === 'completed' && pres.isOfficial === true ? (
                                 <span className="graded-status">
                                   ✓ Graded
                                 </span>

@@ -228,7 +228,7 @@ class RubricCriterion(Base):
     rubric_id = Column(String(36), ForeignKey("rubrics.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
-    max_score = Column(Integer, nullable=False)
+    max_score = Column(Float, nullable=False)
     weight = Column(Float, nullable=False)
     order_index = Column(Integer, nullable=False)
     created_at = Column(DateTime, nullable=False, default=func.now())

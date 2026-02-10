@@ -168,7 +168,20 @@ export default function GradingResultsModal({
               <span className={`context-badge ${currentGrading.contextType === 'class' ? 'class' : 'practice'}`}>
                 {contextLabel}
               </span>
+              {currentGrading.isOfficial && (
+                <span className="official-badge">
+                  Official Grade
+                </span>
+              )}
             </div>
+            {/* Show helpful message if there are both practice and official grades */}
+            {gradings.some(g => g.isOfficial) && gradings.some(g => !g.isOfficial) && (
+              <p className="grading-info-hint" style={{ marginTop: '8px', fontSize: '12px', color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>
+                {currentGrading.isOfficial 
+                  ? "This is your official grade from your instructor."
+                  : "This is your practice self-grade. Compare it with your instructor's official grade above."}
+              </p>
+            )}
           </div>
         </header>
 

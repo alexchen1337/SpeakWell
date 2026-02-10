@@ -147,6 +147,13 @@ export default function AnalyticsPage() {
     }
   };
 
+  // Reset filter if instructor has 'class' filter active (instructors can't join classes)
+  useEffect(() => {
+    if (user?.role === 'instructor' && activeFilter === 'class') {
+      setActiveFilter('all');
+    }
+  }, [user?.role, activeFilter]);
+
   // Filter gradings based on active filter - must be before early returns
   const filteredGradings = useMemo(() => {
     if (activeFilter === 'all') return gradings;
@@ -241,18 +248,20 @@ export default function AnalyticsPage() {
           >
             All
           </button>
-          <button
-            className={`filter-pill ${activeFilter === 'practice' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('practice')}
-          >
-            Practice
-          </button>
-          <button
-            className={`filter-pill ${activeFilter === 'class' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('class')}
-          >
-            Class Assignments
-          </button>
+            <button
+              className={`filter-pill ${activeFilter === 'practice' ? 'active' : ''}`}
+              onClick={() => setActiveFilter('practice')}
+            >
+              Practice
+            </button>
+            {user?.role !== 'instructor' && (
+              <button
+                className={`filter-pill ${activeFilter === 'class' ? 'active' : ''}`}
+                onClick={() => setActiveFilter('class')}
+              >
+                Class Assignments
+              </button>
+            )}
         </div>
 
         {/* Stats Overview */}
