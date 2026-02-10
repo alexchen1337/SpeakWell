@@ -13,9 +13,27 @@ from openai import OpenAI
 ROOT_ENV = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=ROOT_ENV)
 
-from database import get_db, User, AudioFile, Transcript, AudioStatus
+from database import get_db, User, AudioFile, Transcript, AudioStatus, Classroom
 from auth import get_current_user
 from audio import download_file
+
+
+def can_access_audio(audio: AudioFile, user: User, db: Session) -> bool:
+    """
+    Check if user can access an audio file.
+    - Owner can always access
+    - Instructor can access if audio is linked to their class
+    """
+    if audio.user_id == user.id:
+        return True
+    
+    # Check if user is an instructor for the audio's class
+    if audio.class_id:
+        classroom = db.query(Classroom).filter(Classroom.id == audio.class_id).first()
+        if classroom and classroom.instructor_id == user.id:
+            return True
+    
+    return False
 
 router = APIRouter(prefix="/api/transcripts", tags=["transcripts"])
 
@@ -116,13 +134,13 @@ async def get_transcript(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    audio = db.query(AudioFile).filter(
-        AudioFile.id == audio_id,
-        AudioFile.user_id == current_user.id
-    ).first()
+    audio = db.query(AudioFile).filter(AudioFile.id == audio_id).first()
     
     if not audio:
         raise HTTPException(status_code=404, detail="Audio file not found")
+    
+    if not can_access_audio(audio, current_user, db):
+        raise HTTPException(status_code=403, detail="Access denied")
     
     transcript = db.query(Transcript).filter(Transcript.audio_file_id == audio_id).first()
     

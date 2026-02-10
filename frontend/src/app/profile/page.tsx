@@ -14,6 +14,7 @@ export default function ProfilePage() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState('');
   const [updating, setUpdating] = useState(false);
+  const [updatingRole, setUpdatingRole] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
@@ -159,6 +160,24 @@ export default function ProfilePage() {
     }
   };
 
+  const handleRoleChange = async (newRole: 'student' | 'instructor') => {
+    if (newRole === user.role) return;
+    
+    setUpdatingRole(true);
+    setError(null);
+
+    try {
+      await authService.updateRole(newRole);
+      await refreshUser();
+      setSuccess(`Role updated to ${newRole}`);
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to update role');
+    } finally {
+      setUpdatingRole(false);
+    }
+  };
+
   return (
     <main className="app-container">
       <div className="profile-container">
@@ -235,12 +254,22 @@ export default function ProfilePage() {
                 </div>
               )}
             </div>
-            {user.role && (
-              <div className="profile-info-item">
-                <label>Role</label>
-                <p>{user.role}</p>
+            <div className="profile-info-item">
+              <label>Role</label>
+              <div className="role-select-container">
+                <select
+                  value={user.role || ''}
+                  onChange={(e) => handleRoleChange(e.target.value as 'student' | 'instructor')}
+                  disabled={updatingRole}
+                  className="role-select"
+                >
+                  <option value="" disabled>Select your role</option>
+                  <option value="student">Student</option>
+                  <option value="instructor">Instructor</option>
+                </select>
+                {updatingRole && <span className="role-updating">Updating...</span>}
               </div>
-            )}
+            </div>
             {user.organization && (
               <div className="profile-info-item">
                 <label>Organization</label>

@@ -8,6 +8,7 @@ interface GradingResultsModalProps {
   gradings: Grading[];
   onClose: () => void;
   onDelete: (gradingId: string) => Promise<void> | void;
+  currentUserId?: string;
 }
 
 type ViewTab = 'overview' | 'content' | 'delivery';
@@ -15,7 +16,8 @@ type ViewTab = 'overview' | 'content' | 'delivery';
 export default function GradingResultsModal({
   gradings,
   onClose,
-  onDelete
+  onDelete,
+  currentUserId
 }: GradingResultsModalProps) {
   const [selectedGradingIndex, setSelectedGradingIndex] = useState(0);
   const [activeView, setActiveView] = useState<ViewTab>('overview');
@@ -79,6 +81,43 @@ export default function GradingResultsModal({
   const isFailed = currentGrading.status === 'failed';
   const isCompleted = currentGrading.status === 'completed';
 
+  // Determine if user can delete this grading:
+  // - Grading creator can delete their own grading
+  // - Audio owner can ONLY delete self-gradings, NOT instructor/official gradings
+  const isAudioOwner = currentUserId && currentGrading.audioOwnerId 
+    ? currentUserId === currentGrading.audioOwnerId 
+    : false;
+  const isGradingCreator = currentUserId && currentGrading.gradedByUserId
+    ? currentUserId === currentGrading.gradedByUserId
+    : false;
+  const isInstructorGrading = currentGrading.sourceType === 'instructor' || currentGrading.isOfficial;
+  
+  // Students (audio owners who didn't create the grading) cannot delete instructor gradings
+  const canDelete = isGradingCreator || 
+    (isAudioOwner && !isInstructorGrading) || 
+    (!currentUserId && !isInstructorGrading); // default behavior for missing user info
+
+  // Determine graded-by label based on sourceType
+  const getGradedByLabel = () => {
+    if (currentGrading.sourceType === 'instructor') {
+      return currentGrading.gradedByName 
+        ? `Graded by ${currentGrading.gradedByName} (Instructor)`
+        : 'Graded by Instructor';
+    }
+    return 'Self-graded';
+  };
+
+  // Get context label
+  const getContextLabel = () => {
+    if (currentGrading.contextType === 'class') {
+      return currentGrading.contextName || 'Class Assignment';
+    }
+    return 'Practice';
+  };
+
+  const gradedByLabel = getGradedByLabel();
+  const contextLabel = getContextLabel();
+
   // Safe getters for scores
   const overallScore = currentGrading.overallScore ?? 0;
   const pacingScore = currentGrading.pacingScore ?? 0;
@@ -118,9 +157,32 @@ export default function GradingResultsModal({
               </div>
             )}
           </div>
-          {currentGrading.rubricName && gradings.length === 1 && (
-            <p className="grading-rubric-name">Using: {currentGrading.rubricName}</p>
-          )}
+          <div className="grading-header-meta">
+            {currentGrading.rubricName && gradings.length === 1 && (
+              <p className="grading-rubric-name">Using: {currentGrading.rubricName}</p>
+            )}
+            <div className="grading-context-badges">
+              <span className={`graded-by-badge ${currentGrading.sourceType === 'instructor' ? 'instructor' : 'self'}`}>
+                {gradedByLabel}
+              </span>
+              <span className={`context-badge ${currentGrading.contextType === 'class' ? 'class' : 'practice'}`}>
+                {contextLabel}
+              </span>
+              {currentGrading.isOfficial && (
+                <span className="official-badge">
+                  Official Grade
+                </span>
+              )}
+            </div>
+            {/* Show helpful message if there are both practice and official grades */}
+            {gradings.some(g => g.isOfficial) && gradings.some(g => !g.isOfficial) && (
+              <p className="grading-info-hint" style={{ marginTop: '8px', fontSize: '12px', color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>
+                {currentGrading.isOfficial 
+                  ? "This is your official grade from your instructor."
+                  : "This is your practice self-grade. Compare it with your instructor's official grade above."}
+              </p>
+            )}
+          </div>
         </header>
 
         {/* Content */}
@@ -416,7 +478,7 @@ export default function GradingResultsModal({
             Close
           </button>
           <div className="footer-actions">
-            {isCompleted && (
+            {isCompleted && canDelete && (
               <button 
                 className="footer-btn danger" 
                 onClick={handleDelete}

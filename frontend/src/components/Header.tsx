@@ -58,6 +58,12 @@ export default function Header() {
               Library
             </button>
             <button 
+              onClick={() => router.push('/classes')} 
+              className={`nav-link ${pathname === '/classes' || pathname.startsWith('/classes/') ? 'active' : ''}`}
+            >
+              Classes
+            </button>
+            <button 
               onClick={() => router.push('/search')} 
               className={`nav-link ${pathname === '/search' ? 'active' : ''}`}
             >

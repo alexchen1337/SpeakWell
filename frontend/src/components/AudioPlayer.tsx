@@ -13,6 +13,7 @@ interface AudioPlayerProps {
     size?: number;
   } | null;
   onTimeUpdate?: (time: number) => void;
+  onDurationReady?: (duration: number) => void;
 }
 
 export interface AudioPlayerHandle {
@@ -20,11 +21,12 @@ export interface AudioPlayerHandle {
   getCurrentTime: () => number;
 }
 
-const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({ audio, onTimeUpdate }, ref) => {
+const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({ audio, onTimeUpdate, onDurationReady }, ref) => {
   const router = useRouter();
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const onTimeUpdateRef = useRef(onTimeUpdate);
+  const onDurationReadyRef = useRef(onDurationReady);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -35,6 +37,10 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({ audio, on
   useEffect(() => {
     onTimeUpdateRef.current = onTimeUpdate;
   }, [onTimeUpdate]);
+
+  useEffect(() => {
+    onDurationReadyRef.current = onDurationReady;
+  }, [onDurationReady]);
 
   useEffect(() => {
     if (!waveformRef.current) return;
@@ -67,9 +73,16 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({ audio, on
       setWaveformReady(true);
 
       ws.on('ready', () => {
-        setDuration(ws!.getDuration());
+        const calculatedDuration = ws!.getDuration();
+        console.log('WaveSurfer ready, duration:', calculatedDuration);
+        setDuration(calculatedDuration);
         ws!.setVolume(0.7);
         setError(null);
+        // Notify parent of calculated duration (useful when database has null)
+        if (calculatedDuration > 0) {
+          console.log('Calling onDurationReady callback');
+          onDurationReadyRef.current?.(calculatedDuration);
+        }
       });
 
       ws.on('audioprocess', () => {

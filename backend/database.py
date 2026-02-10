@@ -1,4 +1,16 @@
-from sqlalchemy import create_engine, Column, String, Integer, DateTime, ForeignKey, Enum as SQLEnum, Text, JSON, Float
+from sqlalchemy import (
+    create_engine,
+    Column,
+    String,
+    Integer,
+    DateTime,
+    ForeignKey,
+    Enum as SQLEnum,
+    Text,
+    JSON,
+    Float,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -6,6 +18,8 @@ import os
 from dotenv import load_dotenv
 from pathlib import Path
 import enum
+import secrets
+import string
 
 ROOT_ENV = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=ROOT_ENV)
@@ -49,6 +63,18 @@ class GradingStatus(enum.Enum):
     failed = "failed"
 
 
+class GradingSourceType(enum.Enum):
+    """Who initiated the AI grading - student (self) or instructor."""
+    self = "self"
+    instructor = "instructor"
+
+
+class GradingContextType(enum.Enum):
+    """The context of the grading - practice or class assignment."""
+    practice = "practice"
+    class_assignment = "class"
+
+
 class User(Base):
     __tablename__ = "users"
     
@@ -65,6 +91,17 @@ class User(Base):
     audio_files = relationship("AudioFile", back_populates="user", cascade="all, delete-orphan")
     sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")
     rubrics = relationship("Rubric", back_populates="user", cascade="all, delete-orphan")
+    classes_taught = relationship(
+        "Classroom",
+        back_populates="instructor",
+        cascade="all, delete-orphan",
+        foreign_keys="Classroom.instructor_id",
+    )
+    enrollments = relationship(
+        "Enrollment",
+        back_populates="student",
+        cascade="all, delete-orphan",
+    )
 
 
 class AudioFile(Base):
@@ -76,12 +113,69 @@ class AudioFile(Base):
     filename = Column(String(255), nullable=False)
     file_size = Column(Integer, nullable=True)
     duration = Column(Integer, nullable=True)
+    class_id = Column(String(36), ForeignKey("classes.id", ondelete="SET NULL"), nullable=True, index=True)
     status = Column(SQLEnum(AudioStatus), nullable=False, default=AudioStatus.uploaded)
     created_at = Column(DateTime, nullable=False, default=func.now())
     updated_at = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
     
     user = relationship("User", back_populates="audio_files")
     transcript = relationship("Transcript", back_populates="audio_file", uselist=False, cascade="all, delete-orphan")
+    classroom = relationship("Classroom", back_populates="audio_files")
+
+
+class Classroom(Base):
+    __tablename__ = "classes"
+
+    id = Column(String(36), primary_key=True)
+    instructor_id = Column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    join_code = Column(String(32), nullable=False, unique=True, index=True)
+    created_at = Column(DateTime, nullable=False, default=func.now())
+    updated_at = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+
+    instructor = relationship(
+        "User",
+        back_populates="classes_taught",
+        foreign_keys=[instructor_id],
+    )
+    enrollments = relationship(
+        "Enrollment",
+        back_populates="classroom",
+        cascade="all, delete-orphan",
+    )
+    audio_files = relationship("AudioFile", back_populates="classroom")
+
+
+class Enrollment(Base):
+    __tablename__ = "enrollments"
+
+    id = Column(String(36), primary_key=True)
+    class_id = Column(
+        String(36),
+        ForeignKey("classes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    student_id = Column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    created_at = Column(DateTime, nullable=False, default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("class_id", "student_id", name="uq_enrollments_class_student"),
+    )
+
+    classroom = relationship("Classroom", back_populates="enrollments")
+    student = relationship("User", back_populates="enrollments")
 
 
 class Transcript(Base):
@@ -134,7 +228,7 @@ class RubricCriterion(Base):
     rubric_id = Column(String(36), ForeignKey("rubrics.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
-    max_score = Column(Integer, nullable=False)
+    max_score = Column(Float, nullable=False)
     weight = Column(Float, nullable=False)
     order_index = Column(Integer, nullable=False)
     created_at = Column(DateTime, nullable=False, default=func.now())
@@ -148,9 +242,17 @@ class Grading(Base):
     id = Column(String(36), primary_key=True)
     transcript_id = Column(String(36), ForeignKey("transcripts.id", ondelete="CASCADE"), nullable=False, index=True)
     rubric_id = Column(String(36), ForeignKey("rubrics.id", ondelete="SET NULL"), nullable=True, index=True)
+    graded_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     status = Column(SQLEnum(GradingStatus), nullable=False, default=GradingStatus.processing)
     overall_score = Column(Float, nullable=True)
     max_possible_score = Column(Float, nullable=True)
+
+    # Grading context fields - who initiated it and in what context
+    # Using String instead of SQLEnum for better database compatibility
+    source_type = Column(String(20), nullable=False, default="self", index=True)
+    context_type = Column(String(20), nullable=False, default="practice", index=True)
+    context_id = Column(String(36), nullable=True, index=True)  # class_id when context_type = "class"
+    is_official = Column(Integer, nullable=False, default=0)  # 0=False, 1=True (SQLite-friendly)
 
     # Pacing metrics
     pacing_wpm_avg = Column(Float, nullable=True)
@@ -172,6 +274,7 @@ class Grading(Base):
 
     transcript = relationship("Transcript", back_populates="gradings")
     rubric = relationship("Rubric", back_populates="gradings")
+    graded_by = relationship("User", foreign_keys=[graded_by_user_id])
 
 
 def get_db():
@@ -265,6 +368,13 @@ def seed_abet_rubric():
         print(f"Error seeding ABET rubric: {e}")
     finally:
         db.close()
+
+
+def generate_join_code(length: int = 8) -> str:
+    """Generate a unique, human-friendly join code for classrooms."""
+    # Use uppercase letters and digits, excluding confusing chars like 0/O, 1/I/L
+    alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+    return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
 def init_db():

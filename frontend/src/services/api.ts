@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { AudioFile, TranscriptResponse } from '@/types/audio';
 import { Rubric, RubricCreateRequest, RubricUpdateRequest, Grading, GradingInitiateRequest } from '@/types/grading';
+import { Classroom, Student, ClassPresentation, ClassGrading, ClassStats, CreateClassRequest, JoinClassRequest } from '@/types/classroom';
+import { GradingSourceType, GradingContextType } from '@/types/grading';
 import { API_URL } from '@/config';
 
 const API_BASE_URL = API_URL;
@@ -53,6 +55,29 @@ export const audioAPI = {
     return response.data;
   },
 
+  uploadAudioToClass: async (
+    files: File[],
+    classId: string,
+    onProgress?: (fileIndex: number, progress: number) => void
+  ): Promise<AudioFile[]> => {
+    const formData = new FormData();
+    files.forEach((file) => formData.append('audio', file));
+    
+    const response = await axiosInstance.post('/api/audio/upload', formData, {
+      params: { class_id: classId },
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total && onProgress) {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          files.forEach((_, index) => onProgress(index, progress));
+        }
+      },
+    });
+    return response.data;
+  },
+
   getAllAudio: async (): Promise<AudioFile[]> => {
     const response = await axiosInstance.get('/api/audio');
     return response.data;
@@ -77,6 +102,13 @@ export const audioAPI = {
   refreshAudioUrl: async (id: string): Promise<{ url: string }> => {
     const audio = await axiosInstance.get(`/api/audio/${id}`);
     return { url: audio.data.url };
+  },
+
+  updateDuration: async (id: string, duration: number): Promise<{ duration: number }> => {
+    const response = await axiosInstance.patch(`/api/audio/${id}/duration`, null, {
+      params: { duration: Math.round(duration) }
+    });
+    return response.data;
   },
 };
 
@@ -130,6 +162,13 @@ export const rubricAPI = {
   },
 };
 
+export interface GradingFilters {
+  sourceType?: GradingSourceType;
+  contextType?: GradingContextType;
+  classId?: string;
+  onlyOfficial?: boolean;
+}
+
 export const gradingAPI = {
   initiate: async (data: GradingInitiateRequest, replaceExisting: boolean = false): Promise<Grading> => {
     const response = await axiosInstance.post('/api/gradings', data, {
@@ -138,8 +177,14 @@ export const gradingAPI = {
     return response.data;
   },
 
-  listAll: async (): Promise<Grading[]> => {
-    const response = await axiosInstance.get('/api/gradings/all');
+  listAll: async (filters?: GradingFilters): Promise<Grading[]> => {
+    const params: Record<string, string | boolean> = {};
+    if (filters?.sourceType) params.source_type = filters.sourceType;
+    if (filters?.contextType) params.context_type = filters.contextType;
+    if (filters?.classId) params.class_id = filters.classId;
+    if (filters?.onlyOfficial !== undefined) params.only_official = filters.onlyOfficial;
+    
+    const response = await axiosInstance.get('/api/gradings/all', { params });
     return response.data;
   },
 
@@ -155,6 +200,64 @@ export const gradingAPI = {
 
   delete: async (gradingId: string): Promise<void> => {
     await axiosInstance.delete(`/api/gradings/${gradingId}`);
+  },
+};
+
+export const classesAPI = {
+  // Instructor endpoints
+  create: async (data: CreateClassRequest): Promise<Classroom> => {
+    const response = await axiosInstance.post('/api/classes', data);
+    return response.data;
+  },
+
+  listTeaching: async (): Promise<Classroom[]> => {
+    const response = await axiosInstance.get('/api/classes/teaching');
+    return response.data;
+  },
+
+  getStudents: async (classId: string): Promise<Student[]> => {
+    const response = await axiosInstance.get(`/api/classes/${classId}/students`);
+    return response.data;
+  },
+
+  getGradings: async (classId: string): Promise<ClassGrading[]> => {
+    const response = await axiosInstance.get(`/api/classes/${classId}/gradings`);
+    return response.data;
+  },
+
+  getStats: async (classId: string): Promise<ClassStats> => {
+    const response = await axiosInstance.get(`/api/classes/${classId}/stats`);
+    return response.data;
+  },
+
+  deleteClass: async (classId: string): Promise<void> => {
+    await axiosInstance.delete(`/api/classes/${classId}`);
+  },
+
+  // Student endpoints
+  listEnrolled: async (): Promise<Classroom[]> => {
+    const response = await axiosInstance.get('/api/classes/enrolled');
+    return response.data;
+  },
+
+  join: async (data: JoinClassRequest): Promise<Classroom> => {
+    const response = await axiosInstance.post('/api/classes/join', data);
+    return response.data;
+  },
+
+  leave: async (classId: string): Promise<void> => {
+    await axiosInstance.delete(`/api/classes/${classId}/enrollment`);
+  },
+
+  // Shared endpoints
+  get: async (classId: string): Promise<Classroom> => {
+    const response = await axiosInstance.get(`/api/classes/${classId}`);
+    return response.data;
+  },
+
+  getPresentations: async (classId: string): Promise<ClassPresentation[]> => {
+    const response = await axiosInstance.get(`/api/classes/${classId}/presentations`);
+    return response.data;
   },
 };
 

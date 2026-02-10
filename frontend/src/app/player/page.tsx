@@ -21,7 +21,7 @@ interface StoredAudioFile {
 
 export default function PlayerPage() {
   const router = useRouter();
-  const { isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const [audio, setAudio] = useState<StoredAudioFile | null>(null);
   const [loadingAudio, setLoadingAudio] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +41,9 @@ export default function PlayerPage() {
   const [showGradingResults, setShowGradingResults] = useState(false);
   const [gradingInProgress, setGradingInProgress] = useState(false);
   const gradingPollRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Class submission context - students cannot self-grade class submissions
+  const [isStudentClassSubmission, setIsStudentClassSubmission] = useState(false);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -151,6 +154,16 @@ export default function PlayerPage() {
 
       const audioData = JSON.parse(storedAudio);
       
+      // Check if this is a student viewing their own class submission
+      // Students cannot self-grade class submissions - only instructors can
+      const isClassSubmission = audioData.isClassSubmission === true;
+      const isInstructorGrading = audioData.isInstructorGrading === true;
+      
+      // If it's a class submission and NOT an instructor grading session, disable grading
+      if (isClassSubmission && !isInstructorGrading) {
+        setIsStudentClassSubmission(true);
+      }
+      
       const freshAudio = await audioAPI.getAudio(audioData.id);
       
       if (!freshAudio.url) {
@@ -193,6 +206,24 @@ export default function PlayerPage() {
     setCurrentTime(time);
   }, []);
 
+  // When AudioPlayer calculates duration, save it to database if it was missing
+  const handleDurationReady = useCallback(async (calculatedDuration: number) => {
+    if (!audio) return;
+    
+    // Only update if our stored duration was null/undefined/0
+    if (!audio.duration && calculatedDuration > 0) {
+      try {
+        console.log('Saving duration to database:', audio.id, Math.round(calculatedDuration));
+        await audioAPI.updateDuration(audio.id, Math.round(calculatedDuration));
+        // Update local state too
+        setAudio(prev => prev ? { ...prev, duration: Math.round(calculatedDuration) } : null);
+        console.log('Duration saved successfully');
+      } catch (err) {
+        console.error('Failed to save duration:', err);
+      }
+    }
+  }, [audio]);
+
   const handleRetryTranscription = async () => {
     if (!audio) return;
     
@@ -207,6 +238,20 @@ export default function PlayerPage() {
   };
 
   const handleBack = () => {
+    // Check if we came from a class page
+    const storedAudio = localStorage.getItem('currentAudio');
+    if (storedAudio) {
+      try {
+        const audioData = JSON.parse(storedAudio);
+        if (audioData.classId) {
+          // If we came from a class, go back to that class page
+          router.push(`/classes/${audioData.classId}`);
+          return;
+        }
+      } catch {
+        // If parsing fails, just go to library
+      }
+    }
     router.push('/library');
   };
 
@@ -224,9 +269,11 @@ export default function PlayerPage() {
       
       setGradings(prev => [...prev, newGrading]);
       startGradingPolling(transcriptId);
-    } catch (err) {
+    } catch (err: any) {
       setGradingInProgress(false);
-      console.error('Failed to initiate grading:', err);
+      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to initiate grading';
+      console.error('Failed to initiate grading:', errorMessage, err);
+      alert(`Error: ${errorMessage}`); // Temporary - show error to user
     }
   };
 
@@ -376,8 +423,9 @@ export default function PlayerPage() {
                 className="btn-primary btn-small"
                 onClick={() => setShowRubricSelector(true)}
                 disabled={gradingInProgress}
+                title={isStudentClassSubmission ? "Practice self-grading. Your instructor's grade (if available) is the official grade." : undefined}
               >
-                Grade Presentation
+                {isStudentClassSubmission ? "Practice Grade" : "Grade Presentation"}
               </button>
             </>
           )}
@@ -396,6 +444,7 @@ export default function PlayerPage() {
             ref={audioPlayerRef}
             audio={audio} 
             onTimeUpdate={handleTimeUpdate}
+            onDurationReady={handleDurationReady}
           />
         </div>
 
@@ -431,6 +480,7 @@ export default function PlayerPage() {
           gradings={completedGradings}
           onClose={() => setShowGradingResults(false)}
           onDelete={handleDeleteGrading}
+          currentUserId={user?.id}
         />
       )}
     </main>

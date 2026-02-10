@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 
-from database import get_db, User, AudioFile, AudioStatus
+from database import get_db, User, AudioFile, AudioStatus, Classroom, Enrollment
 from auth import get_current_user
 
 ROOT_ENV = Path(__file__).resolve().parent.parent / ".env"
@@ -45,11 +45,24 @@ def extract_audio_duration(file_contents: bytes, filename: str) -> Optional[int]
         return None
     
     try:
-        audio_file = MutagenFile(io.BytesIO(file_contents), easy=True)
-        if audio_file and hasattr(audio_file.info, "length"):
-            return int(audio_file.info.length)
+        # Try without easy=True first for better format support
+        audio_file = MutagenFile(io.BytesIO(file_contents))
+        if audio_file and hasattr(audio_file, 'info') and hasattr(audio_file.info, "length"):
+            duration = int(audio_file.info.length)
+            if duration > 0:
+                return duration
     except Exception:
-        return None
+        pass
+    
+    # Fallback: try with easy=True for some formats
+    try:
+        audio_file = MutagenFile(io.BytesIO(file_contents), easy=True)
+        if audio_file and hasattr(audio_file, 'info') and hasattr(audio_file.info, "length"):
+            duration = int(audio_file.info.length)
+            if duration > 0:
+                return duration
+    except Exception:
+        pass
     
     return None
 
@@ -73,6 +86,24 @@ def download_file(object_key: str) -> bytes:
     client = get_storage_client()
     response = client.storage.from_(STORAGE_BUCKET).download(object_key)
     return response
+
+
+def can_access_audio(audio: AudioFile, user: User, db: Session) -> bool:
+    """
+    Check if user can access an audio file.
+    - Owner can always access
+    - Instructor can access if audio is linked to their class
+    """
+    if audio.user_id == user.id:
+        return True
+    
+    # Check if user is an instructor for the audio's class
+    if audio.class_id:
+        classroom = db.query(Classroom).filter(Classroom.id == audio.class_id).first()
+        if classroom and classroom.instructor_id == user.id:
+            return True
+    
+    return False
 
 
 def get_unique_filename(db: Session, user_id: str, filename: str) -> str:
@@ -113,6 +144,7 @@ def get_unique_filename(db: Session, user_id: str, filename: str) -> str:
 async def upload_audio(
     background_tasks: BackgroundTasks,
     audio: List[UploadFile] = File(...),
+    class_id: Optional[str] = Query(None, description="Optional class ID to associate uploads with"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -121,6 +153,29 @@ async def upload_audio(
     
     if len(audio) > 10:
         raise HTTPException(status_code=400, detail="Maximum 10 files per upload")
+    
+    # Validate class_id if provided
+    validated_class_id = None
+    if class_id:
+        classroom = db.query(Classroom).filter(Classroom.id == class_id).first()
+        if not classroom:
+            raise HTTPException(status_code=404, detail="Class not found")
+        
+        # Check permissions: students must be enrolled, instructors must own the class
+        if current_user.role == "student":
+            enrollment = db.query(Enrollment).filter(
+                Enrollment.class_id == class_id,
+                Enrollment.student_id == current_user.id
+            ).first()
+            if not enrollment:
+                raise HTTPException(status_code=403, detail="You are not enrolled in this class")
+        elif current_user.role == "instructor":
+            if classroom.instructor_id != current_user.id:
+                raise HTTPException(status_code=403, detail="You do not teach this class")
+        else:
+            raise HTTPException(status_code=403, detail="Please set your role before uploading to a class")
+        
+        validated_class_id = class_id
     
     uploaded_files = []
     failed_files = []
@@ -183,6 +238,7 @@ async def upload_audio(
                 filename=unique_filename,
                 file_size=file_size,
                 duration=duration,
+                class_id=validated_class_id,
                 status=AudioStatus.uploaded,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow()
@@ -277,13 +333,13 @@ async def get_audio(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    audio = db.query(AudioFile).filter(
-        AudioFile.id == audio_id,
-        AudioFile.user_id == current_user.id
-    ).first()
+    audio = db.query(AudioFile).filter(AudioFile.id == audio_id).first()
     
     if not audio:
         raise HTTPException(status_code=404, detail="Audio file not found")
+    
+    if not can_access_audio(audio, current_user, db):
+        raise HTTPException(status_code=403, detail="Access denied")
     
     return {
         "id": audio.id,
@@ -345,6 +401,32 @@ async def update_audio(
         "uploadedAt": audio.created_at.isoformat(),
         "updatedAt": audio.updated_at.isoformat(),
     }
+
+
+@router.patch("/{audio_id}/duration")
+async def update_audio_duration(
+    audio_id: str,
+    duration: int = Query(..., gt=0, description="Duration in seconds"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update audio file duration (used when browser calculates duration that mutagen missed)."""
+    audio = db.query(AudioFile).filter(AudioFile.id == audio_id).first()
+    
+    if not audio:
+        raise HTTPException(status_code=404, detail="Audio file not found")
+    
+    # Allow owner or instructor of the class to update
+    if not can_access_audio(audio, current_user, db):
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Only update if duration is currently null (don't overwrite existing)
+    if audio.duration is None:
+        audio.duration = duration
+        audio.updated_at = datetime.utcnow()
+        db.commit()
+    
+    return {"duration": audio.duration}
 
 
 @router.delete("/{audio_id}")
