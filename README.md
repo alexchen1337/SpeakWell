@@ -1,4 +1,5 @@
-<img width="3020" height="1646" alt="image" src="https://github.com/user-attachments/assets/a505c9b0-8437-4171-835b-a8721cc92761" />
+
+https://github.com/user-attachments/assets/1ca49d90-6c28-4b67-b803-c0583006c938
 
 
 ## What This Project Does
@@ -18,12 +19,6 @@ The system is built with a modern full-stack architecture:
 
 It is designed for **educators, teaching assistants, and academic evaluators**
 who need consistent, scalable, and explainable presentation grading.
-
-
-# Demo
-
-https://github.com/user-attachments/assets/c8abbb61-b754-4d6b-9037-38672448e831
-
 
 # Project Setup
 
