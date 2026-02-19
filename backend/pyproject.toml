@@ -1,0 +1,38 @@
+[project]
+name = "speakwell-backend"
+version = "0.1.0"
+description = "SpeakWell Audio API Backend"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.109.0",
+    "uvicorn[standard]==0.27.0",
+    "python-jose[cryptography]==3.3.0",
+    "python-multipart==0.0.6",
+    "httpx>=0.24.0,<0.28.0",
+    "pydantic-settings==2.1.0",
+    "email-validator==2.3.0",
+    "python-dotenv==1.0.0",
+    "sqlalchemy>=2.0.30",
+    "psycopg[binary]>=3.1.0",
+    "alembic==1.13.1",
+    "mutagen==1.47.0",
+    "supabase>=2.0.0",
+    "openai>=1.30.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
+    "httpx>=0.24.0,<0.28.0",
+]
+
+[project.scripts]
+dev = "app.main:dev"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
