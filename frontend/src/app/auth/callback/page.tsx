@@ -24,7 +24,7 @@ function AuthCallbackContent() {
       if (success === 'true') {
         try {
           await refreshAuth();
-          router.push('/');
+          router.push('/dashboard');
         } catch (err) {
           setError('Failed to load user information');
           setTimeout(() => router.push('/login'), 3000);

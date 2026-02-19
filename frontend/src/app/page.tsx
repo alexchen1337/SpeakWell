@@ -1,184 +1,189 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import { useAuth } from '@/contexts/AuthContext';
-import { AudioFile } from '@/types/audio';
-import { audioAPI } from '@/services/api';
 
+const WAVEFORM = [
+  12, 28, 45, 62, 78, 90, 72, 55, 38, 58, 80, 95, 82, 65, 48, 32, 52, 72, 88, 78,
+  58, 38, 48, 68, 85, 95, 75, 52, 35, 58, 78, 88, 68, 48, 30, 48, 68, 82, 72, 58,
+  42, 62, 78, 88, 72, 52, 36, 58, 72, 88, 78, 62, 45, 30, 52, 68, 82, 72, 55, 40,
+];
 
-export default function Home() {
+const CRITERIA = [
+  { label: 'Content', score: 88 },
+  { label: 'Delivery', score: 74 },
+  { label: 'Clarity', score: 91 },
+];
+
+const PLAYED_BARS = 26;
+
+export default function Landing() {
   const router = useRouter();
   const { isAuthenticated, loading } = useAuth();
-  const [audioFiles, setAudioFiles] = useState<AudioFile[]>([]);
-  const [loadingFiles, setLoadingFiles] = useState(true);
-
-  const loadAudioFiles = useCallback(async () => {
-    try {
-      setLoadingFiles(true);
-      const files = await audioAPI.getAllAudio();
-      setAudioFiles(files.map(f => ({
-        ...f,
-        uploadedAt: new Date(f.uploadedAt)
-      })));
-    } catch (error: unknown) {
-      console.error('Failed to load audio files');
-    } finally {
-      setLoadingFiles(false);
-    }
-  }, []);
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      router.push('/login');
+    if (!loading && isAuthenticated) {
+      router.push('/dashboard');
     }
   }, [isAuthenticated, loading, router]);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadAudioFiles();
-    }
-  }, [isAuthenticated, loadAudioFiles]);
-
-  if (loading || !isAuthenticated) return null;
-
-  const recentFiles = audioFiles.slice(0, 3);
-
   return (
-    <main className="home-dashboard">
-      <div className="dashboard-hero">
-        <h1>Welcome to SpeakWell</h1>
-        <p>Grade your Presentations</p>
+    <div className="landing-root">
+      {/* Animated background */}
+      <div className="landing-bg" aria-hidden="true">
+        <div className="landing-bg-grid" />
+        <div className="landing-bg-orb landing-bg-orb-1" />
+        <div className="landing-bg-orb landing-bg-orb-2" />
+        <div className="landing-bg-orb landing-bg-orb-3" />
       </div>
 
-      <div className="dashboard-content">
-        {/* Recent Presentations */}
-        <div className="dashboard-section">
-          <div className="section-header-dash">
-            <h2>Recent Presentations</h2>
-            {!loadingFiles && (
-              <motion.button
-                onClick={() => router.push('/library')}
-                className="view-all-btn"
-                whileHover={{ x: 2 }}
-                whileTap={{ scale: 0.97 }}
-              >
-                View All
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-              </motion.button>
-            )}
-          </div>
+      {/* Nav */}
+      <motion.nav
+        className="landing-nav"
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+      >
+        <span className="landing-brand">SpeakWell</span>
+        <motion.button
+          className="landing-login-btn"
+          onClick={() => router.push('/login')}
+          whileHover={{ scale: 1.04, boxShadow: '0 4px 20px rgba(255, 130, 0, 0.3)' }}
+          whileTap={{ scale: 0.97 }}
+        >
+          Log in
+        </motion.button>
+      </motion.nav>
 
-          {loadingFiles ? (
-            <div className="recent-files">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="recent-file-card" style={{ pointerEvents: 'none', cursor: 'default' }}>
-                  <div className="skeleton-line" style={{ width: '48px', height: '48px', borderRadius: '8px', flexShrink: 0 }}></div>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: 0 }}>
-                    <div className="skeleton-line" style={{ height: '1rem', width: '65%' }}></div>
-                    <div className="skeleton-line" style={{ height: '0.875rem', width: '35%' }}></div>
+      {/* Hero */}
+      <main className="landing-hero">
+        {/* Left zone */}
+        <div className="landing-hero-left">
+          <motion.div
+            className="landing-eyebrow"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+          >
+            Powered by AI
+          </motion.div>
+
+          <motion.h1
+            className="landing-headline"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25, duration: 0.65, ease: [0.4, 0, 0.2, 1] }}
+          >
+            Grade every
+            <br />
+            <span className="landing-headline-accent">word.</span>
+          </motion.h1>
+
+          <motion.p
+            className="landing-subtext"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.38, duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+          >
+            Upload your presentation audio. Get instant AI feedback on content,
+            delivery, and clarity — with detailed rubric scoring.
+          </motion.p>
+
+          <motion.div
+            className="landing-cta-row"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.55, ease: [0.4, 0, 0.2, 1] }}
+          >
+            <motion.button
+              className="landing-cta-primary"
+              onClick={() => router.push('/login')}
+              whileHover={{ scale: 1.04, boxShadow: '0 8px 32px rgba(255, 130, 0, 0.35)' }}
+              whileTap={{ scale: 0.97 }}
+            >
+              Start for free
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              </svg>
+            </motion.button>
+          </motion.div>
+        </div>
+
+        {/* Right zone — product mockup */}
+        <motion.div
+          className="landing-hero-right"
+          initial={{ opacity: 0, x: 40, y: 8 }}
+          animate={{ opacity: 1, x: 0, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.85, ease: [0.4, 0, 0.2, 1] }}
+        >
+          <div className="landing-mockup">
+            {/* Window chrome */}
+            <div className="lm-chrome">
+              <div className="lm-dots">
+                <span className="lm-dot lm-dot-r" />
+                <span className="lm-dot lm-dot-y" />
+                <span className="lm-dot lm-dot-g" />
+              </div>
+              <span className="lm-filename">Q4 Sales Pitch.mp3</span>
+              <span className="lm-score-badge">87 / 100</span>
+            </div>
+
+            {/* Waveform */}
+            <div className="lm-waveform">
+              {WAVEFORM.map((h, i) => (
+                <div
+                  key={i}
+                  className={`lm-waveform-bar${i < PLAYED_BARS ? ' played' : ''}`}
+                  style={{ height: `${h}%` }}
+                />
+              ))}
+            </div>
+
+            {/* Transport controls */}
+            <div className="lm-transport">
+              <div className="lm-play-btn">
+                <svg fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </div>
+              <div className="lm-timeline">
+                <span className="lm-time">2:34</span>
+                <div className="lm-track">
+                  <div className="lm-track-fill" />
+                  <div className="lm-track-handle" />
+                </div>
+                <span className="lm-time">5:47</span>
+              </div>
+            </div>
+
+            <div className="lm-divider" />
+
+            {/* Rubric scores */}
+            <div className="lm-scores">
+              <div className="lm-scores-header">
+                <span>Rubric Scores</span>
+                <span className="lm-overall">
+                  Overall: <strong>87</strong>
+                </span>
+              </div>
+              {CRITERIA.map((c) => (
+                <div key={c.label} className="lm-criterion">
+                  <span className="lm-criterion-label">{c.label}</span>
+                  <div className="lm-criterion-track">
+                    <div
+                      className="lm-criterion-fill"
+                      style={{ width: `${c.score}%` }}
+                    />
                   </div>
-                  <div className="skeleton-line" style={{ width: '20px', height: '20px', flexShrink: 0 }}></div>
+                  <span className="lm-criterion-score">{c.score}</span>
                 </div>
               ))}
             </div>
-          ) : recentFiles.length === 0 ? (
-            <motion.div className="empty-recent" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
-              <p>No presentations yet</p>
-              <span>Upload a file to see it listed here.</span>
-            </motion.div>
-          ) : (
-            <motion.div className="recent-files" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
-              {recentFiles.map((file) => (
-                <motion.div
-                  key={file.id}
-                  className="recent-file-card"
-                  whileHover={{ x: 6 }}
-                  whileTap={{ scale: 0.99 }}
-                  onClick={() => {
-                    localStorage.setItem('currentAudio', JSON.stringify({
-                      id: file.id,
-                      title: file.title,
-                      duration: file.duration,
-                      size: file.size,
-                    }));
-                    router.push('/player');
-                  }}
-                >
-                  <div className="recent-file-icon">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                    </svg>
-                  </div>
-                  <div className="recent-file-info">
-                    <h4>{file.title}</h4>
-                    <p>{(file.size / (1024 * 1024)).toFixed(1)} MB</p>
-                  </div>
-                  <svg className="chevron-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                </motion.div>
-              ))}
-            </motion.div>
-          )}
-        </div>
-
-        {/* Quick Actions */}
-        <div className="dashboard-section">
-          <div className="section-header-dash">
-            <h2>Quick Actions</h2>
           </div>
-          <div className="quick-actions">
-            {[
-              {
-                href: '/library',
-                title: 'Upload Presentation',
-                desc: 'Add a new audio file for analysis',
-                icon: (
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
-                  </svg>
-                ),
-              },
-              {
-                href: '/library',
-                title: 'View Presentations',
-                desc: 'Browse and manage all your files',
-                icon: (
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
-                  </svg>
-                ),
-              },
-              {
-                href: '/search',
-                title: 'Search Transcripts',
-                desc: 'Find content across all files',
-                icon: (
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                ),
-              },
-            ].map((action) => (
-              <motion.button
-                key={action.href + action.title}
-                onClick={() => router.push(action.href)}
-                className="action-card"
-                whileHover={{ y: -5 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <div className="action-icon">{action.icon}</div>
-                <h3>{action.title}</h3>
-                <p>{action.desc}</p>
-              </motion.button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </main>
+        </motion.div>
+      </main>
+    </div>
   );
 }
