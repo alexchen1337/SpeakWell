@@ -139,21 +139,7 @@ export default function SearchPage() {
     ).join('');
   };
 
-  if (loading) {
-    return (
-      <main className="app-container">
-        <div className="search-skeleton">
-          <div className="skeleton-header">
-            <div className="skeleton-line skeleton-title"></div>
-            <div className="skeleton-line skeleton-subtitle"></div>
-          </div>
-          <div className="skeleton-search-bar"></div>
-        </div>
-      </main>
-    );
-  }
-
-  if (!isAuthenticated) {
+  if (loading || !isAuthenticated) {
     return null;
   }
 

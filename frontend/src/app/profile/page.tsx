@@ -96,32 +96,7 @@ export default function ProfilePage() {
     }
   };
 
-  if (loading) {
-    return (
-      <main className="app-container">
-        <div className="profile-container">
-          <div className="profile-header">
-            <div className="skeleton-line" style={{ width: '72px', height: '72px', borderRadius: '50%', margin: '0 auto 1rem' }}></div>
-            <div className="skeleton-line" style={{ height: '28px', width: '160px', margin: '0 auto 0.25rem' }}></div>
-            <div className="skeleton-line" style={{ height: '20px', width: '200px', margin: '0 auto' }}></div>
-          </div>
-          <div className="profile-card">
-            <div className="skeleton-line" style={{ height: '20px', width: '120px', marginBottom: '1rem' }}></div>
-            <div className="profile-info-grid">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i}>
-                  <div className="skeleton-line" style={{ height: '14px', width: '60px', marginBottom: '0.375rem' }}></div>
-                  <div className="skeleton-line" style={{ height: '18px', width: '100%' }}></div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  if (!isAuthenticated || !user) {
+  if (loading || !isAuthenticated || !user) {
     return null;
   }
 

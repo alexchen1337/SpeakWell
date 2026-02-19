@@ -223,40 +223,7 @@ export default function LibraryPage() {
     }
   }, [isAuthenticated, loadAudioFiles]);
 
-  if (loading || loadingFiles) {
-    return (
-      <main className="library-page">
-        <div className="library-header">
-          <div className="skeleton-line" style={{ height: '2.5rem', width: '220px', marginBottom: '0.75rem', margin: '0 auto 0.75rem' }}></div>
-          <div className="skeleton-line" style={{ height: '1.125rem', width: '420px', maxWidth: '90%', margin: '0 auto' }}></div>
-        </div>
-        <div className="library-content">
-          <div className="library-section-new">
-            <div className="section-header">
-              <div className="skeleton-line" style={{ height: '1.5rem', width: '160px' }}></div>
-              <div className="section-header-actions">
-                <div className="skeleton-line" style={{ height: '30px', width: '70px', borderRadius: '2px', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border-default)' }}></div>
-                <div className="skeleton-line" style={{ height: '38px', width: '95px', borderRadius: '2px', background: 'var(--color-accent)', opacity: 0.3 }}></div>
-              </div>
-            </div>
-            <div className="files-grid">
-              {[1, 2, 3, 4, 5, 6].map(i => (
-                <div key={i} className="file-card" style={{ pointerEvents: 'none', cursor: 'default' }}>
-                  <div className="skeleton-line" style={{ height: '56px', width: '56px', borderRadius: '4px', marginBottom: '1.25rem', background: 'var(--color-accent-subtle)' }}></div>
-                  <div style={{ flex: 1 }}>
-                    <div className="skeleton-line" style={{ height: '1rem', width: '80%', marginBottom: '0.75rem' }}></div>
-                    <div className="skeleton-line" style={{ height: '0.8125rem', width: '40%' }}></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  if (!isAuthenticated) {
+  if (loading || !isAuthenticated) {
     return null;
   }
 
@@ -309,7 +276,19 @@ export default function LibraryPage() {
             </div>
           </div>
           
-          {audioFiles.length === 0 && uploadingFiles.length === 0 ? (
+          {loadingFiles ? (
+            <div className="files-grid">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} className="file-card" style={{ pointerEvents: 'none', cursor: 'default' }}>
+                  <div className="skeleton-line" style={{ height: '56px', width: '56px', borderRadius: '8px', marginBottom: '1.25rem' }}></div>
+                  <div style={{ flex: 1 }}>
+                    <div className="skeleton-line" style={{ height: '1rem', width: '80%', marginBottom: '0.75rem' }}></div>
+                    <div className="skeleton-line" style={{ height: '0.8125rem', width: '40%' }}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : audioFiles.length === 0 && uploadingFiles.length === 0 ? (
             <div className="empty-library">
               <svg className="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />

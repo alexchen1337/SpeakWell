@@ -104,26 +104,7 @@ export default function ClassesPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <main className="app-container">
-        <div className="classes-container">
-          <div className="skeleton-line" style={{ height: '32px', width: '200px', marginBottom: '2rem' }}></div>
-          <div className="classes-grid">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="class-card skeleton">
-                <div className="skeleton-line" style={{ height: '24px', width: '70%', marginBottom: '0.75rem' }}></div>
-                <div className="skeleton-line" style={{ height: '16px', width: '50%', marginBottom: '0.5rem' }}></div>
-                <div className="skeleton-line" style={{ height: '14px', width: '40%' }}></div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  if (!isAuthenticated || !user) {
+  if (loading || !isAuthenticated || !user) {
     return null;
   }
 
