@@ -62,12 +62,6 @@ SIGNED_URL_EXPIRES_IN=7200
 
 Requires [OrbStack](https://orbstack.dev) or Docker Desktop.
 
-Copy your `.env` to `backend/.env`:
-```bash
-cp .env backend/.env
-```
-
-Then start the backend:
 ```bash
 docker-compose up --build
 ```
