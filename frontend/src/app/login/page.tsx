@@ -74,7 +74,7 @@ export default function LoginPage() {
       }
 
       await refreshAuth();
-      router.push('/');
+      router.push('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Something went wrong');
     } finally {

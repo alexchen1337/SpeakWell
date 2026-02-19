@@ -22,7 +22,7 @@ export default function Header() {
     setMounted(true);
   }, []);
 
-  if (pathname === '/login' || pathname.startsWith('/auth/')) {
+  if (pathname === '/' || pathname === '/login' || pathname.startsWith('/auth/')) {
     return null;
   }
 

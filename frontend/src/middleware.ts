@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const publicRoutes = ['/login', '/auth/callback'];
+const publicPrefixes = ['/login', '/auth/callback'];
+const publicExact = new Set(['/']);
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
+  const isPublicRoute =
+    publicExact.has(pathname) ||
+    publicPrefixes.some(route => pathname.startsWith(route));
 
   if (isPublicRoute) {
     return NextResponse.next();

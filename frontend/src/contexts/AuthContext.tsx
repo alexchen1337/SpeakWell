@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(null);
     authService.clearCache();
-    router.push('/login');
+    router.push('/');
   }, [router]);
 
   const refreshAuth = useCallback(async () => {
