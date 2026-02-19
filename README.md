@@ -1,3 +1,6 @@
+<img width="3020" height="1646" alt="image" src="https://github.com/user-attachments/assets/a505c9b0-8437-4171-835b-a8721cc92761" />
+
+
 ## What This Project Does
 
 This project automatically grades student presentations using AI, based on
