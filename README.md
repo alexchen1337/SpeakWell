@@ -56,29 +56,49 @@ OPENAI_API_KEY=sk-...
 SIGNED_URL_EXPIRES_IN=7200
 ```
 
-## Backend Setup
+---
+
+## Running with Docker (recommended)
+
+Requires [OrbStack](https://orbstack.dev) or Docker Desktop.
+
+Copy your `.env` to `backend/.env`:
+```bash
+cp .env backend/.env
+```
+
+Then start the backend:
+```bash
+docker-compose up --build
+```
+
+The API will be available at `http://localhost:8000`.
+
+To stop:
+```bash
+docker-compose down
+```
+
+---
+
+## Running Locally (without Docker)
+
+### Backend
 
 ```bash
 cd backend
 
-# Create virtual environment and install dependencies
-uv sync   # creates .venv automatically
-
-# Activate the virtual environment
-source .venv/bin/activate        # Mac / Linux
-.venv\Scripts\activate           # Windows (PowerShell)
+# Install dependencies
+uv sync
 
 # Run the development server
-dev
-
-# Or without activating:
 uv run dev
 ```
 
 The API will be available at `http://localhost:8000`.
 Interactive docs: `http://localhost:8000/docs`
 
-## Frontend Setup
+### Frontend
 
 ```bash
 cd frontend
@@ -90,60 +110,40 @@ pnpm install
 pnpm dev
 ```
 
-The frontend will be available at `http://localhost:3000`.
+The app will be available at `http://localhost:3000`.
 
-## Running Tests
+---
 
-```bash
-cd backend
-
-# With venv activated:
-pytest
-pytest --cov=app
-pytest tests/api/
-pytest tests/dao/
-pytest tests/services/
-
-# Without activating:
-uv run pytest
-uv run pytest --cov=app
-```
-
-Tests use an in-memory SQLite database — no external services required.
-
-
-# Architecture
-
-The backend follows a strict layered architecture:
+## Project Structure
 
 ```
-Request → Route (app/api/) → Schema validation → Service (app/services/) → DAO (app/dao/) → DB
-```
-
-```
-backend/
-├── app/
-│   ├── api/          # Thin route handlers — just call services
-│   │   ├── auth.py
-│   │   ├── audio.py
-│   │   ├── transcription.py
-│   │   ├── grading.py
-│   │   ├── rubrics.py
-│   │   └── classes.py
-│   ├── core/
-│   │   ├── config.py       # Settings loaded from .env
-│   │   ├── security.py     # JWT creation/decoding, cookie helpers
-│   │   └── dependencies.py # FastAPI deps: get_db, get_current_user
-│   ├── dao/          # All database queries — one DAO per model
-│   ├── models/       # SQLAlchemy ORM models
-│   ├── schemas/      # Pydantic request/response schemas
-│   └── services/     # Business logic
-├── tests/
-│   ├── conftest.py   # Fixtures: in-memory DB, TestClient, auth helpers
-│   ├── api/          # Integration tests per route module
-│   ├── dao/          # Unit tests per DAO
-│   └── services/     # Unit tests for business logic
-└── pyproject.toml
+SpeakWell/
+├── frontend/        # Next.js app
+├── backend/         # FastAPI app
+│   ├── app/
+│   │   ├── api/          # Thin route handlers — just call services
+│   │   │   ├── auth.py
+│   │   │   ├── audio.py
+│   │   │   ├── transcription.py
+│   │   │   ├── grading.py
+│   │   │   ├── rubrics.py
+│   │   │   └── classes.py
+│   │   ├── core/
+│   │   │   ├── config.py       # Settings loaded from .env
+│   │   │   ├── security.py     # JWT creation/decoding, cookie helpers
+│   │   │   └── dependencies.py # FastAPI deps: get_db, get_current_user
+│   │   ├── dao/          # All database queries — one DAO per model
+│   │   ├── models/       # SQLAlchemy ORM models
+│   │   ├── schemas/      # Pydantic request/response schemas
+│   │   └── services/     # Business logic
+│   ├── tests/
+│   │   ├── conftest.py   # Fixtures: in-memory DB, TestClient, auth helpers
+│   │   ├── api/          # Integration tests per route module
+│   │   ├── dao/          # Unit tests per DAO
+│   │   └── services/     # Unit tests for business logic
+│   └── pyproject.toml
+├── docker-compose.yml
+└── .env
 ```
 
 ## API Endpoints
