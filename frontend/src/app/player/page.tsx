@@ -295,7 +295,7 @@ export default function PlayerPage() {
   useEffect(() => {
     // Generate skeleton widths only on client side to avoid hydration mismatch
     if (typeof window !== 'undefined') {
-      setSkeletonWidths([1, 2, 3, 4, 5].map(() => 60 + Math.random() * 30));
+      setSkeletonWidths(Array.from({ length: 8 }, () => 55 + Math.random() * 35));
     }
   }, []);
 
@@ -310,57 +310,7 @@ export default function PlayerPage() {
     };
   }, []);
 
-  if (loading || loadingAudio) {
-    return (
-      <main className="player-container">
-        <div className="player-header-bar">
-          <div className="skeleton-line" style={{ height: '36px', width: '160px', borderRadius: '2px' }}></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
-            <div className="skeleton-line" style={{ width: '24px', height: '24px', flexShrink: 0 }}></div>
-            <div className="skeleton-line" style={{ height: '1.5rem', flex: 1, maxWidth: '400px' }}></div>
-          </div>
-          <div className="skeleton-line" style={{ height: '30px', width: '70px', borderRadius: '2px' }}></div>
-        </div>
-        <div className="player-layout">
-          <div className="player-panel">
-            <div className="player-section-header">
-              <div className="skeleton-line" style={{ height: '1.125rem', width: '140px' }}></div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div className="skeleton-line" style={{ height: '140px', width: '100%', borderRadius: '2px' }}></div>
-              <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
-                <div className="skeleton-line" style={{ height: '48px', width: '48px', borderRadius: '2px' }}></div>
-                <div className="skeleton-line" style={{ height: '0.75rem', width: '120px' }}></div>
-              </div>
-            </div>
-          </div>
-          <div className="transcript-panel">
-            <div className="transcript-section-header">
-              <div className="skeleton-line" style={{ height: '1.125rem', width: '120px' }}></div>
-            </div>
-            <div className="transcript-container-new">
-              <div className="transcript-controls">
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <div className="skeleton-line" style={{ height: '30px', width: '80px', borderRadius: '2px' }}></div>
-                  <div className="skeleton-line" style={{ height: '30px', width: '60px', borderRadius: '2px' }}></div>
-                </div>
-                <div className="skeleton-line" style={{ height: '36px', width: '140px', borderRadius: '2px' }}></div>
-              </div>
-              <div className="transcript-content-new">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxWidth: '900px', margin: '0 auto' }}>
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-                    <div key={i} className="skeleton-line" style={{ height: '1.05rem', width: skeletonWidths[i - 1] ? `${skeletonWidths[i - 1]}%` : '85%' }}></div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  if (!isAuthenticated) {
+  if (loading || !isAuthenticated) {
     return null;
   }
 
@@ -403,32 +353,27 @@ export default function PlayerPage() {
           <span>Back to Library</span>
         </button>
         <div className="player-header-actions">
-          {transcriptStatus === 'completed' && (
-            <>
-              {processingGradings.length > 0 && (
-                <div className="grading-status-badge">
-                  <span className="spinner-small"></span>
-                  Grading...
-                </div>
-              )}
-              {completedGradings.length > 0 && (
-                <button 
-                  className="btn-secondary btn-small"
-                  onClick={() => setShowGradingResults(true)}
-                >
-                  View Grading ({completedGradings.length})
-                </button>
-              )}
-              <button 
-                className="btn-primary btn-small"
-                onClick={() => setShowRubricSelector(true)}
-                disabled={gradingInProgress}
-                title={isStudentClassSubmission ? "Practice self-grading. Your instructor's grade (if available) is the official grade." : undefined}
-              >
-                {isStudentClassSubmission ? "Practice Grade" : "Grade Presentation"}
-              </button>
-            </>
+          {transcriptStatus === 'completed' && processingGradings.length > 0 && (
+            <div className="grading-status-badge">
+              <span className="spinner-small"></span>
+              Grading...
+            </div>
           )}
+          <button
+            className="btn-secondary btn-small"
+            onClick={() => setShowGradingResults(true)}
+            disabled={loadingAudio || completedGradings.length === 0}
+          >
+            View Grading
+          </button>
+          <button
+            className="btn-primary btn-small"
+            onClick={() => setShowRubricSelector(true)}
+            disabled={loadingAudio || transcriptStatus !== 'completed' || gradingInProgress}
+            title={isStudentClassSubmission ? "Practice self-grading. Your instructor's grade (if available) is the official grade." : undefined}
+          >
+            {isStudentClassSubmission ? "Practice Grade" : "Grade Presentation"}
+          </button>
           <div className="player-file-size">
             {(audio.size / (1024 * 1024)).toFixed(1)} MB
           </div>
@@ -440,12 +385,22 @@ export default function PlayerPage() {
           <div className="player-section-header">
             <h2>Audio Player</h2>
           </div>
-          <AudioPlayer 
-            ref={audioPlayerRef}
-            audio={audio} 
-            onTimeUpdate={handleTimeUpdate}
-            onDurationReady={handleDurationReady}
-          />
+          {loadingAudio ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div className="skeleton-line" style={{ height: '140px', width: '100%', borderRadius: '8px' }}></div>
+              <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
+                <div className="skeleton-line" style={{ height: '48px', width: '48px', borderRadius: '50%' }}></div>
+                <div className="skeleton-line" style={{ height: '0.75rem', width: '120px' }}></div>
+              </div>
+            </div>
+          ) : (
+            <AudioPlayer
+              ref={audioPlayerRef}
+              audio={audio!}
+              onTimeUpdate={handleTimeUpdate}
+              onDurationReady={handleDurationReady}
+            />
+          )}
         </div>
 
         <div className="transcript-panel">
@@ -457,13 +412,25 @@ export default function PlayerPage() {
               </div>
             )}
           </div>
-          <TranscriptView
-            words={transcriptWords}
-            currentTime={currentTime}
-            onWordClick={handleWordClick}
-            status={transcriptStatus}
-            onRetry={handleRetryTranscription}
-          />
+          {loadingAudio ? (
+            <div className="transcript-container-new">
+              <div className="transcript-content-new">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxWidth: '900px', margin: '0 auto' }}>
+                  {skeletonWidths.map((w, i) => (
+                    <div key={i} className="skeleton-line" style={{ height: '1.05rem', width: `${w}%` }}></div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <TranscriptView
+              words={transcriptWords}
+              currentTime={currentTime}
+              onWordClick={handleWordClick}
+              status={transcriptStatus}
+              onRetry={handleRetryTranscription}
+            />
+          )}
         </div>
       </div>
 

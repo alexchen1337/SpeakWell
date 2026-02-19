@@ -2,15 +2,17 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion } from 'motion/react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AudioFile } from '@/types/audio';
 import { audioAPI } from '@/services/api';
+
 
 export default function Home() {
   const router = useRouter();
   const { isAuthenticated, loading } = useAuth();
   const [audioFiles, setAudioFiles] = useState<AudioFile[]>([]);
-  const [loadingFiles, setLoadingFiles] = useState(false);
+  const [loadingFiles, setLoadingFiles] = useState(true);
 
   const loadAudioFiles = useCallback(async () => {
     try {
@@ -20,7 +22,7 @@ export default function Home() {
         ...f,
         uploadedAt: new Date(f.uploadedAt)
       })));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to load audio files');
     } finally {
       setLoadingFiles(false);
@@ -39,54 +41,7 @@ export default function Home() {
     }
   }, [isAuthenticated, loadAudioFiles]);
 
-  if (loading || loadingFiles) {
-    return (
-      <main className="home-dashboard">
-        <div className="dashboard-hero">
-          <div className="skeleton-line" style={{ height: '3.5rem', width: '450px', marginBottom: '1rem', maxWidth: '90%', margin: '0 auto 1rem' }}></div>
-          <div className="skeleton-line" style={{ height: '1.375rem', width: '320px', maxWidth: '80%', margin: '0 auto' }}></div>
-        </div>
-        <div className="dashboard-content">
-          <div className="dashboard-section">
-            <div className="section-header-dash">
-              <div className="skeleton-line" style={{ height: '1.75rem', width: '280px' }}></div>
-              <div className="skeleton-line" style={{ height: '38px', width: '100px', borderRadius: '2px' }}></div>
-            </div>
-            <div className="recent-files">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="recent-file-card" style={{ pointerEvents: 'none', cursor: 'default', background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border-default)' }}>
-                  <div className="skeleton-line" style={{ width: '48px', height: '48px', borderRadius: '4px', flexShrink: 0 }}></div>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: 0 }}>
-                    <div className="skeleton-line" style={{ height: '1rem', width: '65%' }}></div>
-                    <div className="skeleton-line" style={{ height: '0.875rem', width: '35%' }}></div>
-                  </div>
-                  <div className="skeleton-line" style={{ width: '20px', height: '20px', flexShrink: 0 }}></div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="dashboard-section">
-            <div className="section-header-dash">
-              <div className="skeleton-line" style={{ height: '1.75rem', width: '180px' }}></div>
-            </div>
-            <div className="quick-actions">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="action-card" style={{ pointerEvents: 'none', cursor: 'default', background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border-default)' }}>
-                  <div className="skeleton-line" style={{ width: '56px', height: '56px', borderRadius: '4px', marginBottom: '1rem' }}></div>
-                  <div className="skeleton-line" style={{ height: '1.125rem', width: '70%', marginBottom: '1rem' }}></div>
-                  <div className="skeleton-line" style={{ height: '0.9375rem', width: '90%' }}></div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
+  if (loading || !isAuthenticated) return null;
 
   const recentFiles = audioFiles.slice(0, 3);
 
@@ -96,28 +51,53 @@ export default function Home() {
         <h1>Welcome to SpeakWell</h1>
         <p>Grade your Presentations</p>
       </div>
+
       <div className="dashboard-content">
+        {/* Recent Presentations */}
         <div className="dashboard-section">
           <div className="section-header-dash">
             <h2>Recent Presentations</h2>
-            <button onClick={() => router.push('/library')} className="view-all-btn">
-              View All
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+            {!loadingFiles && (
+              <motion.button
+                onClick={() => router.push('/library')}
+                className="view-all-btn"
+                whileHover={{ x: 2 }}
+                whileTap={{ scale: 0.97 }}
+              >
+                View All
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </motion.button>
+            )}
           </div>
-          {recentFiles.length === 0 ? (
-            <div className="empty-recent">
+
+          {loadingFiles ? (
+            <div className="recent-files">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="recent-file-card" style={{ pointerEvents: 'none', cursor: 'default' }}>
+                  <div className="skeleton-line" style={{ width: '48px', height: '48px', borderRadius: '8px', flexShrink: 0 }}></div>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: 0 }}>
+                    <div className="skeleton-line" style={{ height: '1rem', width: '65%' }}></div>
+                    <div className="skeleton-line" style={{ height: '0.875rem', width: '35%' }}></div>
+                  </div>
+                  <div className="skeleton-line" style={{ width: '20px', height: '20px', flexShrink: 0 }}></div>
+                </div>
+              ))}
+            </div>
+          ) : recentFiles.length === 0 ? (
+            <motion.div className="empty-recent" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
               <p>No presentations yet</p>
               <span>Upload a file to see it listed here.</span>
-            </div>
+            </motion.div>
           ) : (
-            <div className="recent-files">
+            <motion.div className="recent-files" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
               {recentFiles.map((file) => (
-                <div
+                <motion.div
                   key={file.id}
                   className="recent-file-card"
+                  whileHover={{ x: 6 }}
+                  whileTap={{ scale: 0.99 }}
                   onClick={() => {
                     localStorage.setItem('currentAudio', JSON.stringify({
                       id: file.id,
@@ -140,46 +120,62 @@ export default function Home() {
                   <svg className="chevron-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                   </svg>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           )}
         </div>
 
+        {/* Quick Actions */}
         <div className="dashboard-section">
           <div className="section-header-dash">
             <h2>Quick Actions</h2>
           </div>
           <div className="quick-actions">
-            <button onClick={() => router.push('/library')} className="action-card">
-              <div className="action-icon">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
-                </svg>
-              </div>
-              <h3>Upload Presentation</h3>
-              <p>Add a new audio file for analysis</p>
-            </button>
-
-            <button onClick={() => router.push('/library')} className="action-card">
-              <div className="action-icon">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
-                </svg>
-              </div>
-              <h3>View Presentations</h3>
-              <p>Browse and manage all your files</p>
-            </button>
-
-            <button onClick={() => router.push('/search')} className="action-card">
-              <div className="action-icon">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <h3>Search Transcripts</h3>
-              <p>Find content across all files</p>
-            </button>
+            {[
+              {
+                href: '/library',
+                title: 'Upload Presentation',
+                desc: 'Add a new audio file for analysis',
+                icon: (
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+                  </svg>
+                ),
+              },
+              {
+                href: '/library',
+                title: 'View Presentations',
+                desc: 'Browse and manage all your files',
+                icon: (
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+                  </svg>
+                ),
+              },
+              {
+                href: '/search',
+                title: 'Search Transcripts',
+                desc: 'Find content across all files',
+                icon: (
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                ),
+              },
+            ].map((action) => (
+              <motion.button
+                key={action.href + action.title}
+                onClick={() => router.push(action.href)}
+                className="action-card"
+                whileHover={{ y: -5 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <div className="action-icon">{action.icon}</div>
+                <h3>{action.title}</h3>
+                <p>{action.desc}</p>
+              </motion.button>
+            ))}
           </div>
         </div>
       </div>

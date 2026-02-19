@@ -202,29 +202,7 @@ export default function AnalyticsPage() {
   };
 
   // Early returns for loading/auth states - must be AFTER all hooks
-  if (loading || loadingData) {
-    return (
-      <main className="app-container">
-        <div className="analytics-skeleton">
-          <div className="skeleton-header">
-            <div className="skeleton-line" style={{ width: '200px', height: '32px' }}></div>
-            <div className="skeleton-line" style={{ width: '300px', height: '20px', marginTop: '8px' }}></div>
-          </div>
-          <div className="gradings-grid">
-            {[1, 2, 3, 4, 5, 6].map(i => (
-              <div key={i} className="grading-card skeleton-card">
-                <div className="skeleton-line" style={{ width: '60%', height: '20px' }}></div>
-                <div className="skeleton-line" style={{ width: '40%', height: '16px', marginTop: '8px' }}></div>
-                <div className="skeleton-line" style={{ width: '80px', height: '40px', marginTop: '16px' }}></div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  if (!isAuthenticated) {
+  if (loading || !isAuthenticated) {
     return null;
   }
 
@@ -266,6 +244,16 @@ export default function AnalyticsPage() {
 
         {/* Stats Overview */}
         <div className="stats-grid">
+          {loadingData && [1, 2, 3].map(i => (
+            <div key={i} className="stat-card">
+              <div className="skeleton-line" style={{ width: '44px', height: '44px', borderRadius: '8px', flexShrink: 0 }}></div>
+              <div className="stat-content">
+                <div className="skeleton-line" style={{ width: '80px', height: '13px', marginBottom: '0.5rem' }}></div>
+                <div className="skeleton-line" style={{ width: '48px', height: '28px' }}></div>
+              </div>
+            </div>
+          ))}
+          {!loadingData && <>
           <div className="stat-card">
             <div className="stat-icon">
               <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -315,6 +303,7 @@ export default function AnalyticsPage() {
               </div>
             </div>
           )}
+          </>}
         </div>
 
         {rubricError && (
@@ -349,7 +338,18 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {filteredGradings.length === 0 ? (
+        {loadingData ? (
+          <div className="gradings-grid">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <div key={i} className="grading-card">
+                <div className="skeleton-line" style={{ width: '70%', height: '20px', marginBottom: '0.75rem' }}></div>
+                <div className="skeleton-line" style={{ width: '45%', height: '14px', marginBottom: '1rem' }}></div>
+                <div className="skeleton-line" style={{ width: '64px', height: '64px', borderRadius: '50%', marginBottom: '0.75rem' }}></div>
+                <div className="skeleton-line" style={{ width: '55%', height: '13px' }}></div>
+              </div>
+            ))}
+          </div>
+        ) : filteredGradings.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">
               <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
