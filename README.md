@@ -1,8 +1,8 @@
 ## Demo
 
-https://github.com/user-attachments/assets/1ca49d90-6c28-4b67-b803-c0583006c938
+https://github.com/user-attachments/assets/41f17dca-da42-460e-a4bd-640d474125f8
 
-HD: https://youtu.be/hIJg_Xyjhro
+HD: [https://youtu.be/hIJg_Xyjhro](https://youtu.be/JvrZYyc28S4)
 
 ## What This Project Does
 
