@@ -2,7 +2,10 @@
 
 https://github.com/user-attachments/assets/610f7605-4e81-47e9-8f4f-37a61804787d
 
-HD: [https://youtu.be/hIJg_Xyjhro](https://youtu.be/EQ4D3hS9acc)
+HD: [YouTube Link][https://youtu.be/hIJg_Xyjhro](https://youtu.be/EQ4D3hS9acc)
+
+## Docs
+[Link](https://www.notion.so/SpeakWell-Developer-Docs-30de09fb8c6f81cea630dfbe1fd9e4fa?source=copy_link)
 
 ## What This Project Does
 
