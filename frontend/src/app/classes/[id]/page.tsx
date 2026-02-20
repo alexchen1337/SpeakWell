@@ -224,7 +224,7 @@ export default function ClassDetailPage() {
 
   if (loading || loadingData) {
     return (
-      <main className="app-container">
+      <main className="app-container studio-class-detail">
         <div className="class-detail-container">
           <div className="skeleton-line" style={{ height: '32px', width: '40%', marginBottom: '0.5rem' }}></div>
           <div className="skeleton-line" style={{ height: '20px', width: '60%', marginBottom: '2rem' }}></div>
@@ -247,7 +247,7 @@ export default function ClassDetailPage() {
 
   if (error && !classroom) {
     return (
-      <main className="app-container">
+      <main className="app-container studio-class-detail">
         <div className="class-detail-container">
           <div className="error-card">
             <h2>Error</h2>
@@ -266,7 +266,7 @@ export default function ClassDetailPage() {
   }
 
   return (
-    <main className="app-container">
+    <main className="app-container studio-class-detail">
       <div className="class-detail-container">
         <div className="class-detail-header">
           <button onClick={() => router.push('/classes')} className="back-button">
