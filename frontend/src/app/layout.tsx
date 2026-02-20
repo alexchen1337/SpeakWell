@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
+import "../styles/tokens.css";
 import "./globals.css";
+import "../styles/library.css";
+import "../styles/studio-pages.css";
 
 export const metadata: Metadata = {
   title: "SpeakWell",

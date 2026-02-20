@@ -46,7 +46,7 @@ export default function Dashboard() {
   const recentFiles = audioFiles.slice(0, 3);
 
   return (
-    <main className="home-dashboard">
+    <main className="home-dashboard studio-dashboard">
       <div className="dashboard-hero">
         <h1>Welcome to SpeakWell</h1>
         <p>Grade your Presentations</p>

@@ -207,7 +207,7 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <main className="app-container">
+    <main className="app-container studio-analytics">
       <header className="app-header">
         <h1>Analytics Dashboard</h1>
         <p>

@@ -46,6 +46,14 @@ export default function Header() {
     }
   };
 
+  const handleLogoClick = () => {
+    if (isAuthenticated) {
+      router.push('/dashboard');
+      return;
+    }
+    router.push('/');
+  };
+
   const isActive = (href: string) =>
     href === '/classes'
       ? pathname === '/classes' || pathname.startsWith('/classes/')
@@ -61,7 +69,7 @@ export default function Header() {
       <div className="header-container">
         <motion.div
           className="header-logo"
-          onClick={() => router.push('/')}
+          onClick={handleLogoClick}
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           style={{ cursor: 'pointer' }}

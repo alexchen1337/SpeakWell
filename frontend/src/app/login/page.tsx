@@ -84,7 +84,7 @@ export default function LoginPage() {
 
 
   return (
-    <div className="login-page">
+    <div className="login-page studio-login">
       <div className="login-container">
         <div className="login-brand">
           <h1 className="brand-name">SpeakWell</h1>

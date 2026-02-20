@@ -316,7 +316,7 @@ export default function PlayerPage() {
 
   if (error) {
     return (
-      <main className="app-container">
+      <main className="app-container studio-player">
         <header className="app-header">
           <button onClick={handleBack} className="back-button">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -344,7 +344,7 @@ export default function PlayerPage() {
   const processingGradings = gradings.filter(g => g.status === 'processing');
 
   return (
-    <main className="player-container">
+    <main className="player-container studio-player">
       <div className="player-header-bar">
         <button onClick={handleBack} className="back-button-new">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
