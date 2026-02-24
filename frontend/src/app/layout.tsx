@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
+import KeyboardProvider from "@/components/KeyboardProvider"
 import "../styles/tokens.css";
 import "./globals.css";
 import "../styles/library.css";
@@ -29,7 +30,9 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         <AuthProvider>
           <Header />
-          {children}
+            <KeyboardProvider>
+              {children}
+            </KeyboardProvider>
         </AuthProvider>
       </body>
     </html>
