@@ -6808,7 +6808,7 @@ input, select, textarea {
 .focus-highlight {
   position: relative;
   z-index: 1000;
-  outline: 2px solid #ffffff;
+  outline: 3px solid #ffffff;
   outline-offset: 4px;
   border-radius: 6px;
 }

@@ -11,15 +11,6 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type WaveSurfer from "wavesurfer.js";
 
-// Page order for h/l navigation
-const ROUTES = [
-  "/dashboard",
-  "/library",
-  "/classes",
-  "/search",
-  "/analytics",
-];
-
 // Shift+Key → page mapping
 const SHIFT_ROUTES: Record<string, string> = {
   S: "/search",
@@ -201,17 +192,8 @@ export default function KeyboardProvider({
       /* ----------------------------
          PAGE NAVIGATION OUTSIDE FOCUS MODE
       ----------------------------- */
-      const index = ROUTES.indexOf(pathname);
-      if (index !== -1 && !isTyping && !isFocusMode) {
+      if (!isTyping && !isFocusMode) {
         switch (e.key) {
-          case "h":
-            e.preventDefault();
-            router.push(ROUTES[(index - 1 + ROUTES.length) % ROUTES.length]);
-            break;
-          case "l":
-            e.preventDefault();
-            router.push(ROUTES[(index + 1) % ROUTES.length]);
-            break;
           case "j":
             e.preventDefault();
             window.scrollBy({ top: 120, behavior: "smooth" });
