@@ -2,9 +2,8 @@
 
 /*
  * Issues:
- *  1. Focus mode does not highlight audio upload button
+ *  1. Focus mode does not recognize audio upload button
  *  2. No way to change volume on player screen
- *  3. Start focus mode on first element of popup screen; escape to exit popup
  */
 
 import { useEffect, useState, useRef } from "react";
@@ -33,7 +32,7 @@ export default function KeyboardProvider({
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [focusables, setFocusables] = useState<HTMLElement[]>([]);
   const [focusedIndex, setFocusedIndex] = useState(0);
-  const [lastFocusedByPath, setLastFocusedByPath] = useState<Record<string, number>>({});
+  const [lastFocusedByScope, setLastFocusedByScope] = useState<Record<string, number>>({});
 
   /*
    * Reset Focus Mode when route changes
@@ -41,28 +40,45 @@ export default function KeyboardProvider({
   useEffect(() => {
       if (prevPathRef.current && prevPathRef.current !== pathname) {
         // Clear stored focus index when leaving a screen
-        setLastFocusedByPath({});
+        setLastFocusedByScope({});
         setIsFocusMode(false);
       }
 
       prevPathRef.current = pathname;
   }, [pathname]);
 
+  const getActiveModal = (): HTMLElement | null => {
+      return document.querySelector<HTMLElement>(".modal-content");
+  };
+
   /*
    * Get every element on screen that is selectable in Focus Mode
    */
   const getFocusableElements = () => {
+    const modal = getActiveModal();
+    const root: ParentNode = modal ?? document;
+
     const all = Array.from(
-      document.querySelectorAll<HTMLElement>(
+      root.querySelectorAll<HTMLElement>(
         "button, a, [role='button'], input:not([type='hidden']), textarea"
       )
     ).filter(el => !el.hasAttribute("disabled"));
 
+    if (!modal) {
+        const header = document.querySelector("header");
+        if (header) {
+            return all.filter(el => !header.contains(el));
+        }
+    }
+    return all;
+
+        /*
     // Skip any elements inside the header
     const header = document.querySelector("header");
     if (!header) return all;
 
     return all.filter(el => !header.contains(el));
+    */
   };
 
   /* 
@@ -73,6 +89,7 @@ export default function KeyboardProvider({
 
     focusables.forEach(el => el.classList.remove("focus-highlight"));
     const active = focusables[focusedIndex];
+
     active?.classList.add("focus-highlight");
     active?.scrollIntoView({ block: "center" });
   }, [isFocusMode, focusedIndex, focusables]);
@@ -87,26 +104,52 @@ export default function KeyboardProvider({
         target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
         target.isContentEditable;
+      const modal = getActiveModal();
 
       // ESC Key
       if (e.key === "Escape") {
-        if (isFocusMode) {          // Exit Focus Mode
+        if (isTyping) {
           e.preventDefault();
 
+          // Exit text box
+          target.blur();
+          return;
+        }
+        if (isFocusMode) {          
+          e.preventDefault();
+
+          const modal = getActiveModal();
+          const scopeKey = modal ? 'modal' : pathname;
+
           // Save the last focused element
-          setLastFocusedByPath(prev => ({
+          setLastFocusedByScope(prev => ({
               ...prev,
-              [pathname]: focusedIndex
+              [scopeKey]: focusedIndex
           }));
 
+          // Exit Focus Mode
           focusables.forEach(el => el.classList.remove("focus-highlight"));
           setIsFocusMode(false);
           return;
         }
-        if (isTyping) {
-          // Exit text box
+        if (modal) {
           e.preventDefault();
-          target.blur();
+
+          // Close modal
+          const overlay = modal.parentElement;
+          overlay?.dispatchEvent(
+            new MouseEvent("click", { bubbles: true })
+          );
+
+          // Reset modal focus index
+          setLastFocusedByScope(prev => {
+           const next = { ...prev};
+           delete next['modal'];
+           return next;
+          });
+
+          // Exit Focus Mode
+          setIsFocusMode(false);
           return;
         }
       }
@@ -160,9 +203,12 @@ export default function KeyboardProvider({
             break;
           case "Enter":
             // Save the last focused element
-            setLastFocusedByPath(prev => ({
+            const modal = getActiveModal();
+            const scopeKey = modal ? 'modal' : pathname;
+
+            setLastFocusedByScope(prev => ({
                 ...prev,
-                [pathname]: focusedIndex
+                [scopeKey]: focusedIndex
             }));
 
             if (active.tagName === "INPUT" || active.tagName === "TEXTAREA") {
@@ -188,12 +234,30 @@ export default function KeyboardProvider({
 
         setFocusables(els);
 
-        const savedIndex = lastFocusedByPath[pathname];
-        setFocusedIndex(
-            savedIndex !== undefined && savedIndex < els.length
+        const modal = getActiveModal();
+        const scopeKey = modal ? 'modal' : pathname;
+
+        if (modal) {
+          const modalFocusables = els.filter(el => modal.contains(el));
+          setFocusables(modalFocusables);
+        
+          const savedIndex = lastFocusedByScope['modal'];
+          setFocusedIndex(
+            savedIndex !== undefined && savedIndex < modalFocusables.length
             ? savedIndex
-            : 0
-        );
+            : 1         // 1st element is the exit button. It is
+                        // more logical to default to 2nd element.
+          );
+        } else {
+            setFocusables(els);
+        
+            const savedIndex = lastFocusedByScope[scopeKey];
+            setFocusedIndex(
+                savedIndex !== undefined && savedIndex < els.length
+                ? savedIndex
+                : 0
+            );
+        }
 
         setIsFocusMode(true);
         return;
@@ -242,16 +306,18 @@ export default function KeyboardProvider({
        * Page Navigation Outside Focus Mode
        */
       if (!isTyping && !isFocusMode) {
+        const container = getActiveModal() ?? document.scrollingElement ?? document.documentElement;
+
         switch (e.key) {
           case "j":
             // Scroll down (j)
             e.preventDefault();
-            window.scrollBy({ top: 120, behavior: "smooth" });
+            container.scrollBy({ top: 120, behavior: "smooth" });
             break;
           case "k":
             // Scroll up (k)
             e.preventDefault();
-            window.scrollBy({ top: -120, behavior: "smooth" });
+            container.scrollBy({ top: -120, behavior: "smooth" });
             break;
         }
       }
@@ -263,7 +329,6 @@ export default function KeyboardProvider({
 
   return (
     <>
-      {isFocusMode && <div className="focus-overlay" />}
       {children}
     </>
   );
