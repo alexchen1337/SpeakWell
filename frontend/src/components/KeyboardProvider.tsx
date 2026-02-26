@@ -4,14 +4,14 @@
  * Issues:
  *  1. Focus mode does not highlight audio upload button
  *  2. No way to change volume on player screen
- *  3. Keybindings does not work on create rubric popup
+ *  3. Start focus mode on first element of popup screen; escape to exit popup
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type WaveSurfer from "wavesurfer.js";
 
-// Shift+Key → page mapping
+// Shift+Key Page Mapping
 const SHIFT_ROUTES: Record<string, string> = {
   S: "/search",
   L: "/library",
@@ -28,14 +28,29 @@ export default function KeyboardProvider({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const prevPathRef = useRef<string | null>(null);
 
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [focusables, setFocusables] = useState<HTMLElement[]>([]);
   const [focusedIndex, setFocusedIndex] = useState(0);
+  const [lastFocusedByPath, setLastFocusedByPath] = useState<Record<string, number>>({});
 
-  /* ----------------------------
-     Helpers
-  ----------------------------- */
+  /*
+   * Reset Focus Mode when route changes
+   */
+  useEffect(() => {
+      if (prevPathRef.current && prevPathRef.current !== pathname) {
+        // Clear stored focus index when leaving a screen
+        setLastFocusedByPath({});
+        setIsFocusMode(false);
+      }
+
+      prevPathRef.current = pathname;
+  }, [pathname]);
+
+  /*
+   * Get every element on screen that is selectable in Focus Mode
+   */
   const getFocusableElements = () => {
     const all = Array.from(
       document.querySelectorAll<HTMLElement>(
@@ -50,9 +65,9 @@ export default function KeyboardProvider({
     return all.filter(el => !header.contains(el));
   };
 
-  /* ----------------------------
-     Highlight active element
-  ----------------------------- */
+  /* 
+  * Highlight focused element 
+  */
   useEffect(() => {
     if (!isFocusMode || focusables.length === 0) return;
 
@@ -62,9 +77,9 @@ export default function KeyboardProvider({
     active?.scrollIntoView({ block: "center" });
   }, [isFocusMode, focusedIndex, focusables]);
 
-  /* ----------------------------
-     Keyboard handling
-  ----------------------------- */
+  /* 
+   * Keyboard handling
+   */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -73,27 +88,40 @@ export default function KeyboardProvider({
         target.tagName === "TEXTAREA" ||
         target.isContentEditable;
 
-      /* ----------------------------
-         ESC KEY
-      ----------------------------- */
+      // ESC Key
       if (e.key === "Escape") {
-        if (isFocusMode) {
+        if (isFocusMode) {          // Exit Focus Mode
           e.preventDefault();
+
+          // Save the last focused element
+          setLastFocusedByPath(prev => ({
+              ...prev,
+              [pathname]: focusedIndex
+          }));
+
           focusables.forEach(el => el.classList.remove("focus-highlight"));
           setIsFocusMode(false);
           return;
         }
         if (isTyping) {
+          // Exit text box
           e.preventDefault();
           target.blur();
           return;
         }
       }
 
-      /* ----------------------------
-         SHIFT+KEY GLOBAL SHORTCUTS
-      ----------------------------- */
+      /* 
+       * Shift+Key Global Shortcuts
+       */
       if (e.shiftKey && !isTyping) {
+        // Jump to screen in SHIFT_ROUTES
+        //    (S)earch
+        //    (L)ibrary
+        //    (C)lasses
+        //    (A)nalytics
+        //    (D)ashboard
+        //    (P)rofile
         const route = SHIFT_ROUTES[e.key.toUpperCase()];
         if (route) {
           e.preventDefault();
@@ -101,6 +129,7 @@ export default function KeyboardProvider({
           return;
         }
 
+        // Sign out (Q)
         if (e.key.toUpperCase() === "Q") {
           e.preventDefault();
           const signOutButton = Array.from(
@@ -112,27 +141,37 @@ export default function KeyboardProvider({
         }
       }
 
-      /* ----------------------------
-         Focus mode shortcuts
-      ----------------------------- */
+      /* 
+       * Focus mode shortcuts
+       */
       if (isFocusMode) {
         e.preventDefault();
         const active = focusables[focusedIndex];
         if (!active) return;
 
         switch (e.key) {
-          case "k":
-            setFocusedIndex(i => (i - 1 + focusables.length) % focusables.length);
-            break;
           case "j":
+            // Jump to next focusable element (j)
             setFocusedIndex(i => (i + 1) % focusables.length);
             break;
+          case "k":
+            // Jump to previous focusable element (k)
+            setFocusedIndex(i => (i - 1 + focusables.length) % focusables.length);
+            break;
           case "Enter":
+            // Save the last focused element
+            setLastFocusedByPath(prev => ({
+                ...prev,
+                [pathname]: focusedIndex
+            }));
+
             if (active.tagName === "INPUT" || active.tagName === "TEXTAREA") {
               (active as HTMLInputElement | HTMLTextAreaElement).focus();
             } else {
+              // Select focused element (Enter)
               active.click();
             }
+
             focusables.forEach(el => el.classList.remove("focus-highlight"));
             setIsFocusMode(false);
             break;
@@ -140,28 +179,36 @@ export default function KeyboardProvider({
         return;
       }
 
-      /* ----------------------------
-         Toggle focus mode with f
-      ----------------------------- */
+      // Enter Focus Mode (f)
       if (e.key === "f" && !isTyping && !isFocusMode) {
         e.preventDefault();
+
         const els = getFocusableElements();
         if (els.length === 0) return;
+
         setFocusables(els);
-        setFocusedIndex(0);
+
+        const savedIndex = lastFocusedByPath[pathname];
+        setFocusedIndex(
+            savedIndex !== undefined && savedIndex < els.length
+            ? savedIndex
+            : 0
+        );
+
         setIsFocusMode(true);
         return;
       }
 
-      /* ----------------------------
-         PLAYER SCREEN SHORTCUTS
-      ----------------------------- */
+      /* 
+       * Player Screen Shortcuts
+       */
       if (!isTyping && !isFocusMode && pathname.startsWith("/player")) {
         const ws: WaveSurfer | null = (window as any).wavesurferInstance;
         const playButton = document.querySelector<HTMLButtonElement>(".play-btn");
 
         switch (e.key) {
           case " ":
+            // Pause/play (Space)
             e.preventDefault();
             if (ws) ws.playPause();
             else playButton?.click();
@@ -169,6 +216,7 @@ export default function KeyboardProvider({
 
           case ">":
           case ".":
+            // Fast forward 10s (. or >)
             e.preventDefault();
             if (ws) {
               const time = ws.getCurrentTime() + 10;
@@ -179,6 +227,7 @@ export default function KeyboardProvider({
 
           case "<":
           case ",":
+            // Rewind 10s (, or <)
             e.preventDefault();
             if (ws) {
               const time = ws.getCurrentTime() - 10;
@@ -189,16 +238,18 @@ export default function KeyboardProvider({
         }
       }
 
-      /* ----------------------------
-         PAGE NAVIGATION OUTSIDE FOCUS MODE
-      ----------------------------- */
+      /* 
+       * Page Navigation Outside Focus Mode
+       */
       if (!isTyping && !isFocusMode) {
         switch (e.key) {
           case "j":
+            // Scroll down (j)
             e.preventDefault();
             window.scrollBy({ top: 120, behavior: "smooth" });
             break;
           case "k":
+            // Scroll up (k)
             e.preventDefault();
             window.scrollBy({ top: -120, behavior: "smooth" });
             break;
