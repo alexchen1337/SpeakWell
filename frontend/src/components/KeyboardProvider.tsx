@@ -4,9 +4,7 @@
  * Issues:
  *  1. Focus mode does not recognize audio upload button
  *  2. No way to change volume on player screen
- *  3. j and k do not scroll in modal
- *  4. Make it more obvious that you are in focus mode (maybe message in bottom
- *     right of screen)
+ *  3. j and k do not scroll in modals
  */
 
 import { useEffect, useState, useRef } from "react";
@@ -16,70 +14,42 @@ import './KeyboardProvider.css'
 
 /* =========================================================
     KEYBOARD MAPPINGS
-   ---------------------------------------------------------
-    NORMAL MODE
-        f           :   Enter Focus Mode
-        j           :   Scroll Down
-        k           :   Scroll Up
-        Escape      :   Exit text box
-        Shift+s     :   Navigate to Search
-        Shift+l     :   Navigate to Library
-        Shift+c     :   Navigate to Classes
-        Shift+a     :   Navigate to Analytics
-        Shift+d     :   Navigate to Dashboard
-        Shift+p     :   Navigate to Profile
-        Shift+q     :   Sign Out
-
-        PLAYER SCREEN
-            Space       :   Pause/Play
-            . or >      :   Forward 10s
-            , or <      :   Backward 10s
-
-    FOCUS MODE
-        j           :   Next Focusable Element
-        k           :   Previous Focusable Element
-        t           :   Jump to Top of Focusable Elements
-        m           :   Jump to Middle of Focusable Elements
-        b           :   Jump to Bottom of Focusable Elements
-        Enter       :   Activate Focused Element
-        Escape or f :   Exit Focus Mode
-
-   ========================================================= */
-
+========================================================= */
 export const KEYMAP = {
-  NORMAL: {
-    ENTER_FOCUS: "f",
-    SCROLL_DOWN: "j",
-    SCROLL_UP: "k",
-  },
-
-  FOCUS: {
-    NEXT: "j",
-    PREV: "k",
-    TOP: "t",
-    MIDDLE: "m",
-    BOTTOM: "b",
-    SELECT_ELEMENT: "Enter",
-    EXIT_FOCUS: ["Escape", "f"],
-  },
-
-  PLAYER: {
-    PLAY_PAUSE: " ",
-    FORWARD: [".", ">"],
-    REWIND: [",", "<"],
-  },
-
-  GLOBAL: {
-    SIGN_OUT: "Q",
-    ESCAPE: "Escape",
+  GLOBAL_BINDINGS: {
+    SHOW_BINDS  : { key: "H",             desc: "Toggle List of Bindings"},
+    SIGN_OUT    : { key: "Q",             desc: "Sign Out" },
+    ESCAPE      : { key: "Escape",        desc: "Cancel" },
     ROUTES: {
-      D: "/dashboard",
-      L: "/library",
-      C: "/classes",
-      S: "/search",
-      A: "/analytics",
-      P: "/profile",
+      D         : { key: "D",             desc: "Dashboard",  route: "/dashboard"},
+      L         : { key: "L",             desc: "Library",    route: "/library"},
+      C         : { key: "C",             desc: "Classes",    route: "/classes" },
+      S         : { key: "S",             desc: "Search",     route: "/search" },
+      A         : { key: "A",             desc: "Analytics",  route: "/analytics"},
+      P         : { key: "P",             desc: "Profile",    route: "/profile"},
     },
+  },
+
+  NORMAL_MODE: {
+    ENTER_FOCUS : { key: "f",             desc: "Enter Focus Mode" },
+    SCROLL_DOWN : { key: "j",             desc: "Scroll Down" },
+    SCROLL_UP   : { key: "k",             desc: "Scroll Up" },
+  },
+
+  FOCUS_MODE: {
+    NEXT        : { key: "j",             desc: "Next Element" },
+    PREV        : { key: "k",             desc: "Previous Element" },
+    TOP         : { key: "t",             desc: "Go to Top Element" },
+    MIDDLE      : { key: "m",             desc: "Go to Middle Element" },
+    BOTTOM      : { key: "b",             desc: "Go to Bottom Element" },
+    SELECT      : { key: "Enter",         desc: "Select Focused Element" },
+    EXIT_FOCUS  : { key: ["Escape", "f"], desc: "Exit Focus Mode" },
+  },
+
+  AUDIO_PLAYER: {
+    PLAY_PAUSE  : { key: " ",             desc: "Play / Pause" },
+    FORWARD     : { key: [".", ">"],      desc: "Fast Forward" },
+    REWIND      : { key: [",", "<"],      desc: "Rewind" },
   },
 } as const;
 
@@ -96,6 +66,7 @@ export default function KeyboardProvider({
   const [focusables, setFocusables] = useState<HTMLElement[]>([]);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [lastFocusedByScope, setLastFocusedByScope] = useState<Record<string, number>>({});
+  const [showKeybindings, setShowKeybindings] = useState(false);
 
   /*
    * Reset Focus Mode when route changes
@@ -160,7 +131,7 @@ export default function KeyboardProvider({
       const modal = getActiveModal();
 
       // ESC Key
-      if (e.key === KEYMAP.GLOBAL.ESCAPE && !isFocusMode) {
+      if (e.key === KEYMAP.GLOBAL_BINDINGS.ESCAPE.key && !isFocusMode) {
         if (isTyping) {
           e.preventDefault();
 
@@ -194,16 +165,17 @@ export default function KeyboardProvider({
          Shift+Key Global Shortcuts
       ========================================================= */
       if (e.shiftKey && !isTyping) {
-        // Jump to route in GLOBAL.ROUTES
-        const route = KEYMAP.GLOBAL.ROUTES[e.key.toUpperCase() as keyof typeof KEYMAP.GLOBAL.ROUTES];
-        if (route) {
+        // Jump to route in GLOBAL_BINDINGS.ROUTES
+        const routeObj = KEYMAP.GLOBAL_BINDINGS.ROUTES[e.key.toUpperCase() as keyof typeof KEYMAP.GLOBAL.ROUTES];
+        if (routeObj) {
           e.preventDefault();
-          if (pathname !== route) router.push(route);
+          const routePath = routeObj.route;
+          if (pathname !== routePath) router.push(routePath);
           return;
         }
 
         // Sign out
-        if (e.key.toUpperCase() === KEYMAP.GLOBAL.SIGN_OUT) {
+        if (e.key.toUpperCase() === KEYMAP.GLOBAL_BINDINGS.SIGN_OUT.key) {
           e.preventDefault();
           const signOutButton = Array.from(
             document.querySelectorAll<HTMLButtonElement>(".auth-button")
@@ -211,6 +183,12 @@ export default function KeyboardProvider({
           signOutButton?.click();
           setIsFocusMode(false);
           return;
+        }
+
+        // Show keybindings
+        if (e.key.toUpperCase() === KEYMAP.GLOBAL_BINDINGS.SHOW_BINDS.key) {
+            setShowKeybindings(v => !v);
+            return;
         }
       }
 
@@ -226,8 +204,8 @@ export default function KeyboardProvider({
 
         switch (e.key) {
 
-          case KEYMAP.FOCUS.EXIT_FOCUS[0]:
-          case KEYMAP.FOCUS.EXIT_FOCUS[1]:
+          case KEYMAP.FOCUS_MODE.EXIT_FOCUS.key[0]:
+          case KEYMAP.FOCUS_MODE.EXIT_FOCUS.key[1]:
             // Save the last focused element
             setLastFocusedByScope(prev => ({
                 ...prev,
@@ -238,32 +216,32 @@ export default function KeyboardProvider({
             focusables.forEach(el => el.classList.remove("focus-highlight"));
             setIsFocusMode(false);
 
-          case KEYMAP.FOCUS.NEXT:            
+          case KEYMAP.FOCUS_MODE.NEXT.key:            
             // Jump to next focusable element
             setFocusedIndex(i => (i + 1) % focusables.length);
             break;
 
-          case KEYMAP.FOCUS.PREV:            
+          case KEYMAP.FOCUS_MODE.PREV.key:            
             // Jump to previous focusable element
             setFocusedIndex(i => (i - 1 + focusables.length) % focusables.length);
             break;
 
-          case KEYMAP.FOCUS.TOP:
+          case KEYMAP.FOCUS_MODE.TOP.key:
             // Jump to first focusable element
             setFocusedIndex(0);
             break;
 
-          case KEYMAP.FOCUS.MIDDLE:
+          case KEYMAP.FOCUS_MODE.MIDDLE.key:
             // Jump to middle focusable element
             setFocusedIndex(focusables.length/2);
             break;
 
-          case KEYMAP.FOCUS.BOTTOM:
+          case KEYMAP.FOCUS_MODE.BOTTOM.key:
             // Jump to last focusable element
             setFocusedIndex(focusables.length-1)
             break;
 
-          case KEYMAP.FOCUS.SELECT_ELEMENT:
+          case KEYMAP.FOCUS_MODE.SELECT.key:
             // Save the last focused element
             setLastFocusedByScope(prev => ({
                 ...prev,
@@ -288,7 +266,7 @@ export default function KeyboardProvider({
       }
 
       // Enter Focus Mode
-      if (e.key === KEYMAP.NORMAL.ENTER_FOCUS && !isTyping && !isFocusMode) {
+      if (e.key === KEYMAP.NORMAL_MODE.ENTER_FOCUS.key && !isTyping && !isFocusMode) {
         e.preventDefault();
 
         const els = getFocusableElements();
@@ -332,15 +310,15 @@ export default function KeyboardProvider({
         const playButton = document.querySelector<HTMLButtonElement>(".play-btn");
 
         switch (e.key) {
-          case KEYMAP.PLAYER.PLAY_PAUSE:
+          case KEYMAP.AUDIO_PLAYER.PLAY_PAUSE.key:
             // Pause/play
             e.preventDefault();
             if (ws) ws.playPause();
             else playButton?.click();
             break;
 
-          case KEYMAP.PLAYER.FORWARD[0]:
-          case KEYMAP.PLAYER.FORWARD[1]:
+          case KEYMAP.AUDIO_PLAYER.FORWARD.key[0]:
+          case KEYMAP.AUDIO_PLAYER.FORWARD.key[1]:
             // Fast forward 10s
             e.preventDefault();
             if (ws) {
@@ -350,8 +328,8 @@ export default function KeyboardProvider({
             }
             break;
 
-          case KEYMAP.PLAYER.REWIND[0]:
-          case KEYMAP.PLAYER.REWIND[1]:
+          case KEYMAP.AUDIO_PLAYER.REWIND.key[0]:
+          case KEYMAP.AUDIO_PLAYER.REWIND.key[1]:
             // Rewind 10s
             e.preventDefault();
             if (ws) {
@@ -369,11 +347,11 @@ export default function KeyboardProvider({
       if (!isTyping && !isFocusMode) {
         const container = getActiveModal() ?? document.scrollingElement ?? document.documentElement;
         switch (e.key) {
-          case KEYMAP.NORMAL.SCROLL_DOWN:
+          case KEYMAP.NORMAL_MODE.SCROLL_DOWN.key:
             e.preventDefault();
             container.scrollBy({ top: 120, behavior: "smooth" });
             break;
-          case KEYMAP.NORMAL.SCROLL_UP:
+          case KEYMAP.NORMAL_MODE.SCROLL_UP.key:
             e.preventDefault();
             container.scrollBy({ top: -120, behavior: "smooth" });
             break;
@@ -388,6 +366,68 @@ export default function KeyboardProvider({
   return (
     <>
       {children}
+
+      {!showKeybindings ? (
+        <div className="mode-indicator">
+          <div className="mode-title">{isFocusMode ? "Focus Mode" : "Normal Mode"}</div>
+          <div className="mode-hint">
+            {isFocusMode ? (
+              <>
+                <p><kbd>j</kbd> / <kbd>k</kbd> to navigate</p>
+                <p><kbd>Enter</kbd> to select</p>
+                <p><kbd>Esc</kbd> / <kbd>f</kbd> to exit</p>
+              </>
+            ) : (
+              <>
+                <p><kbd>j</kbd> / <kbd>k</kbd> to scroll</p>
+                <p><kbd>f</kbd> to enter Focus Mode</p>
+              </>
+            )}
+            <br />
+            <p>Press <kbd>H</kbd> to see the full list of bindings</p>
+          </div>
+        </div>
+      ) : (
+        <div className="mode-indicator">
+          <h3>KEYBINDINGS</h3>
+          <ul>
+            {Object.entries(KEYMAP).map(([modeKey, modeObj]) => (
+              <li key={modeKey} style={{ marginTop: "1rem" }}>
+                <strong>{modeKey.replace(/_/g, " ")}</strong>
+                <ul>
+                  {modeKey === "GLOBAL_BINDINGS" ? (
+                    <>
+                      <li><kbd>{modeObj.SHOW_BINDS.key}</kbd> {modeObj.SHOW_BINDS.desc}</li>
+                      <li><kbd>{modeObj.SIGN_OUT.key}</kbd> {modeObj.SIGN_OUT.desc}</li>
+                      {Object.entries(modeObj.ROUTES).map(([k, v]) => (
+                        <li key={k}><kbd>{v.key}</kbd> {v.desc}</li>
+                      ))}
+                    </>
+                  ) : (
+                    Object.entries(modeObj).map(([k, v]) => {
+                      if (k === "ROUTES") return null;
+                      return (
+                        <li key={k}>
+                          {Array.isArray(v.key) ? (
+                            v.key.map((kItem, i) => (
+                              <span key={kItem}>
+                                <kbd>{kItem}</kbd>
+                                {i < v.key.length - 1 && " / "}
+                              </span>
+                            ))
+                          ) : (
+                            <kbd>{v.key === " " ? "Space" : v.key}</kbd>
+                          )} {v.desc}
+                        </li>
+                      );
+                    })
+                  )}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </>
   );
 }
