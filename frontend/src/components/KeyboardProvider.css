@@ -1,0 +1,7 @@
+.focus-highlight {
+  position: relative;
+  z-index: 1002;
+  outline: 3px solid #ffffff;
+  outline-offset: 4px;
+  border-radius: 6px;
+}

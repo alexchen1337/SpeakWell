@@ -12,6 +12,7 @@
 import { useEffect, useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type WaveSurfer from "wavesurfer.js";
+import './KeyboardProvider.css'
 
 /* =========================================================
     KEYBOARD MAPPINGS
