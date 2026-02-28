@@ -215,6 +215,7 @@ export default function KeyboardProvider({
             // Exit Focus Mode
             focusables.forEach(el => el.classList.remove("focus-highlight"));
             setIsFocusMode(false);
+            break;
 
           case KEYMAP.FOCUS_MODE.NEXT.key:            
             // Jump to next focusable element
