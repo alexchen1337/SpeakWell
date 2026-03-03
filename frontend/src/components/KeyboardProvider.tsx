@@ -2,9 +2,14 @@
 
 /*
  * Issues:
- *  1. Focus mode does not recognize audio upload button
- *  2. No way to change volume on player screen
- *  3. j and k do not scroll in modals
+ *  1. Remember the last focused element only if it’s visible, otherwise jump
+ *     to the first visible focusable element.
+ *        * t should jump to first visible focusable element
+ *        * m should jump to middel visible focusable element
+ *        * b should jump to last visible focusable element
+ *  2. Focus mode does not recognize audio upload button
+ *  3. No way to change volume on player screen
+ *  4. j and k do not scroll in modals
  */
 
 import { useEffect, useState, useRef } from "react";
@@ -34,15 +39,18 @@ export const KEYMAP = {
     ENTER_FOCUS : { key: "f",             desc: "Enter Focus Mode" },
     SCROLL_DOWN : { key: "j",             desc: "Scroll Down" },
     SCROLL_UP   : { key: "k",             desc: "Scroll Up" },
+    SCROLL_TOP  : { key: "t",             desc: "Scroll to Top of Screen" },
+    SCROLL_MID  : { key: "m",             desc: "Scroll to Middle of Screen" },
+    SCROLL_BOT  : { key: "b",             desc: "Scroll to Bottom of Screen" },
   },
 
   FOCUS_MODE: {
     NEXT        : { key: "j",             desc: "Next Element" },
     PREV        : { key: "k",             desc: "Previous Element" },
-    TOP         : { key: "t",             desc: "Go to Top Element" },
-    MIDDLE      : { key: "m",             desc: "Go to Middle Element" },
-    BOTTOM      : { key: "b",             desc: "Go to Bottom Element" },
-    SELECT      : { key: "Enter",         desc: "Select Focused Element" },
+    SELECT      : { key: "Enter",         desc: "Select Element" },
+    TOP         : { key: "t",             desc: "Go to Top Visible Element" },
+    MIDDLE      : { key: "m",             desc: "Go to Middle Visble Element" },
+    BOTTOM      : { key: "b",             desc: "Go to Bottom Visible Element" },
     EXIT_FOCUS  : { key: ["Escape", "f"], desc: "Exit Focus Mode" },
   },
 
@@ -67,6 +75,10 @@ export default function KeyboardProvider({
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [lastFocusedByScope, setLastFocusedByScope] = useState<Record<string, number>>({});
   const [showKeybindings, setShowKeybindings] = useState(false);
+
+/* =========================================================
+    HELPERS
+========================================================= */
 
   /*
    * Reset Focus Mode when route changes
@@ -346,15 +358,30 @@ export default function KeyboardProvider({
          Page Navigation
       ========================================================= */
       if (!isTyping && !isFocusMode) {
-        const container = getActiveModal() ?? document.scrollingElement ?? document.documentElement;
         switch (e.key) {
           case KEYMAP.NORMAL_MODE.SCROLL_DOWN.key:
             e.preventDefault();
-            container.scrollBy({ top: 120, behavior: "smooth" });
+            window.scrollBy({ top: 120, behavior: "smooth" });
             break;
+
           case KEYMAP.NORMAL_MODE.SCROLL_UP.key:
             e.preventDefault();
-            container.scrollBy({ top: -120, behavior: "smooth" });
+            window.scrollBy({ top: -120, behavior: "smooth" });
+            break;
+
+          case KEYMAP.NORMAL_MODE.SCROLL_TOP.key:
+            e.preventDefault();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            break;
+
+          case KEYMAP.NORMAL_MODE.SCROLL_MID.key:
+            e.preventDefault();
+            window.scrollTo({ top: document.body.scrollHeight / 2, behavior: "smooth" });
+            break;
+
+          case KEYMAP.NORMAL_MODE.SCROLL_BOT.key:
+            e.preventDefault();
+            window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
             break;
         }
       }
@@ -364,69 +391,98 @@ export default function KeyboardProvider({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [pathname, router, isFocusMode, focusables, focusedIndex]);
 
+  function ShortcutRow({
+    desc,
+    keys,
+  }: {
+    desc: string;
+    keys: string[];
+  }) {
+    return (
+      <div className="shortcut-row">
+        <div className="shortcut-desc">{desc}</div>
+
+        <div className="shortcut-keys">
+          {keys.map((key, i) => (
+            <span key={i} className="shortcut-key-group">
+              <kbd>{key}</kbd>
+              {i < keys.length - 1 && (
+                <span className="shortcut-slash">/</span>
+              )}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       {children}
 
-      {!showKeybindings ? (
-        <div className="mode-indicator">
-          <div className="mode-title">{isFocusMode ? "Focus Mode" : "Normal Mode"}</div>
-          <div className="mode-hint">
-            {isFocusMode ? (
-              <>
-                <p><kbd>j</kbd> / <kbd>k</kbd> to navigate</p>
-                <p><kbd>Enter</kbd> to select</p>
-                <p><kbd>Esc</kbd> / <kbd>f</kbd> to exit</p>
-              </>
-            ) : (
-              <>
-                <p><kbd>j</kbd> / <kbd>k</kbd> to scroll</p>
-                <p><kbd>f</kbd> to enter Focus Mode</p>
-              </>
-            )}
-            <br />
-            <p>Press <kbd>H</kbd> to see the full list of bindings</p>
-          </div>
-        </div>
-      ) : (
-        <div className="mode-indicator">
-          <h3>KEYBINDINGS</h3>
-          <ul>
-            {Object.entries(KEYMAP).map(([modeKey, modeObj]) => (
-              <li key={modeKey} style={{ marginTop: "1rem" }}>
-                <strong>{modeKey.replace(/_/g, " ")}</strong>
-                <ul>
+      {/* Compact Hint Bar*/}
+      <div className="keyboard-hint-bar">
+        <span className="hint-toggle">
+          <span className="hint-text">Press</span>
+          <kbd>{KEYMAP.GLOBAL_BINDINGS.SHOW_BINDS.key}</kbd>
+          <span className="hint-text">to view the full list of shortcuts</span>
+        </span>
+
+        <span className="hint-separator">•</span>
+        <span className="mode-label">
+          {isFocusMode ? "Focus Mode" : "Normal Mode"}
+        </span>
+      </div>
+
+      {/* Shortcuts Panel */}
+      {showKeybindings && (
+        <div className="shortcuts-overlay">
+          <div className="shortcuts-container">
+            <h2 className="shortcuts-title">Keyboard Shortcuts</h2>
+
+            <div className="shortcuts-grid">
+              {Object.entries(KEYMAP).map(([modeKey, modeObj]) => (
+                <div key={modeKey} className="shortcut-section">
+                  <div className="section-title">
+                    {modeKey.replace(/_/g, " ")}
+                  </div>
+                  <div className="section-divider" />
+
                   {modeKey === "GLOBAL_BINDINGS" ? (
                     <>
-                      <li><kbd>{modeObj.SHOW_BINDS.key}</kbd> {modeObj.SHOW_BINDS.desc}</li>
-                      <li><kbd>{modeObj.SIGN_OUT.key}</kbd> {modeObj.SIGN_OUT.desc}</li>
+                      <ShortcutRow
+                        desc={modeObj.SIGN_OUT.desc}
+                        keys={[modeObj.SIGN_OUT.key]}
+                      />
                       {Object.entries(modeObj.ROUTES).map(([k, v]) => (
-                        <li key={k}><kbd>{v.key}</kbd> {v.desc}</li>
+                        <ShortcutRow
+                          key={k}
+                          desc={v.desc}
+                          keys={[v.key]}
+                        />
                       ))}
                     </>
                   ) : (
                     Object.entries(modeObj).map(([k, v]) => {
-                      if (k === "ROUTES") return null;
+                      const keyArray = Array.isArray(v.key)
+                        ? v.key
+                        : [v.key];
+
                       return (
-                        <li key={k}>
-                          {Array.isArray(v.key) ? (
-                            v.key.map((kItem, i) => (
-                              <span key={kItem}>
-                                <kbd>{kItem}</kbd>
-                                {i < v.key.length - 1 && " / "}
-                              </span>
-                            ))
-                          ) : (
-                            <kbd>{v.key === " " ? "Space" : v.key}</kbd>
-                          )} {v.desc}
-                        </li>
+                        <ShortcutRow
+                          key={k}
+                          desc={v.desc}
+                          keys={keyArray.map(kItem =>
+                            kItem === " " ? "Space" : kItem
+                          )}
+                        />
                       );
                     })
                   )}
-                </ul>
-              </li>
-            ))}
-          </ul>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </>
