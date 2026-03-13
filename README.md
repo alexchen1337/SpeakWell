@@ -106,6 +106,7 @@ pnpm dev
 ```
 
 The app will be available at `http://localhost:3000`.
+Public pages include `/` (landing), `/login`, and `/terms` (Terms of Service).
 
 ---
 
