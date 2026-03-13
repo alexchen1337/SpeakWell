@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -47,14 +48,19 @@ export default function Landing() {
         transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
       >
         <span className="landing-brand">SpeakWell</span>
-        <motion.button
-          className="landing-login-btn"
-          onClick={() => router.push('/login')}
-          whileHover={{ scale: 1.04, boxShadow: '0 4px 20px rgba(255, 130, 0, 0.3)' }}
-          whileTap={{ scale: 0.97 }}
-        >
-          Log in
-        </motion.button>
+        <div className="landing-nav-actions">
+          <Link href="/terms" className="landing-legal-link">
+            Terms
+          </Link>
+          <motion.button
+            className="landing-login-btn"
+            onClick={() => router.push('/login')}
+            whileHover={{ scale: 1.04, boxShadow: '0 4px 20px rgba(255, 130, 0, 0.3)' }}
+            whileTap={{ scale: 0.97 }}
+          >
+            Log in
+          </motion.button>
+        </div>
       </motion.nav>
 
       {/* Hero */}
