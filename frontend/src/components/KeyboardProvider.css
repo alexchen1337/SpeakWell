@@ -1,7 +1,7 @@
 .focus-highlight {
   position: relative;
   z-index: 1002;
-  outline: 3px solid #ffffff;
+  outline: 3px solid var(--color-text-primary);
   outline-offset: 4px;
   border-radius: 6px;
 }
@@ -13,16 +13,16 @@
   bottom: 0;
   right: 0;
   width: 100%;
-  background: #111;
-  border-top: 1px solid #2a2a2a;
+  background: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-border-subtle);
   padding: 3px 8px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
   font-size: 0.85rem;
-  color: #ddd;
-  z-index: 1000;
+  color: var(--color-text-primary);
+  z-index: 2000;
 }
 .mode-label {
   font-weight: 600;
@@ -46,8 +46,8 @@
   bottom: 35px;
   left: 0;
   width: 100%;
-  background: #0e0e0e;
-  border-top: 1px solid #2a2a2a;
+  background: var(--color-bg-primary);
+  border-top: 1px solid var(--color-border-default);
   padding: 32px 48px;
   z-index: 9999;
 }
@@ -75,11 +75,11 @@
 .section-title {
   font-weight: 600;
   margin-bottom: 6px;
-  color: #f5f5f5;
+  color: var(--color-text-primary);
 }
 .section-divider {
   height: 1px;
-  background: #2a2a2a;
+  background: var(--color-border-subtle);
   margin-bottom: 12px;
 }
 /* =========================================
@@ -107,10 +107,10 @@
    Key Styling
 ========================================= */
 kbd {
-  background: #2b2b2b;
-  border: 1px solid #3a3a3a;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 0.75rem;
-  color: #fff;
+  color: var(--color-text-primary);
 }
