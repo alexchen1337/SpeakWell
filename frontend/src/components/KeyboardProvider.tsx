@@ -2,14 +2,8 @@
 
 /*
  * Issues:
- *  1. Remember the last focused element only if it’s visible, otherwise jump
- *     to the first visible focusable element.
- *        * t should jump to first visible focusable element
- *        * m should jump to middel visible focusable element
- *        * b should jump to last visible focusable element
- *  2. Focus mode does not recognize audio upload button
- *  3. No way to change volume on player screen
- *  4. j and k do not scroll in modals
+ *  1. Odd behavior when focusing 'Close' and 'Delete' buttons in grading modal
+ *  2. No way to change volume on player screen
  */
 
 import { useEffect, useState, useRef } from "react";
@@ -43,21 +37,22 @@ export const KEYMAP = {
     SCROLL_MID  : { key: "m",             desc: "Scroll to Middle of Screen" },
     SCROLL_BOT  : { key: "b",             desc: "Scroll to Bottom of Screen" },
   },
-
   FOCUS_MODE: {
+    EXIT_FOCUS  : { key: ["Escape", "f"], desc: "Exit Focus Mode" },
     NEXT        : { key: "j",             desc: "Next Element" },
     PREV        : { key: "k",             desc: "Previous Element" },
-    SELECT      : { key: "Enter",         desc: "Select Element" },
     TOP         : { key: "t",             desc: "Go to Top Visible Element" },
     MIDDLE      : { key: "m",             desc: "Go to Middle Visble Element" },
     BOTTOM      : { key: "b",             desc: "Go to Bottom Visible Element" },
-    EXIT_FOCUS  : { key: ["Escape", "f"], desc: "Exit Focus Mode" },
+    SELECT      : { key: "Enter",         desc: "Select Element" },
   },
 
   AUDIO_PLAYER: {
     PLAY_PAUSE  : { key: " ",             desc: "Play / Pause" },
     FORWARD     : { key: [".", ">"],      desc: "Fast Forward" },
     REWIND      : { key: [",", "<"],      desc: "Rewind" },
+    VIEW_GRADE  : { key: "v",             desc: "View Grading"},
+    GRADE_PRES  : { key: "g",             desc: "Grade Presentation"},
   },
 } as const;
 
@@ -76,45 +71,50 @@ export default function KeyboardProvider({
   const [lastFocusedByScope, setLastFocusedByScope] = useState<Record<string, number>>({});
   const [showKeybindings, setShowKeybindings] = useState(false);
 
-/* =========================================================
-    HELPERS
-========================================================= */
+  /* =========================================================
+     FOCUS MODE HELPERS
+  ========================================================= */
 
   /*
-   * Reset Focus Mode when route changes
-   */
-  useEffect(() => {
-      if (prevPathRef.current && prevPathRef.current !== pathname) {
-        // Clear stored focus index when leaving a screen
-        setLastFocusedByScope({});
-        setIsFocusMode(false);
-      }
-
-      prevPathRef.current = pathname;
-  }, [pathname]);
-
-  const getActiveModal = (): HTMLElement | null => {
-      return document.querySelector<HTMLElement>(".modal-content");
-  };
-
-  /*
-   * Get every element on screen that is selectable in Focus Mode
+   * Get every HTML element that should be focusable in Focus Mode
    */
   const getFocusableElements = () => {
     const modal = getActiveModal();
     const root: ParentNode = modal ?? document;
 
-    const all = Array.from(
-      root.querySelectorAll<HTMLElement>(
-        "button, a, [role='button'], input:not([type='hidden']), textarea"
-      )
+    let all = Array.from(
+      root.querySelectorAll<HTMLElement>(`
+        button, 
+        a, 
+        [role='button'], 
+        input:not([type='hidden']), 
+        textarea, 
+        .grading-card.completed, 
+        .library-upload-dropzone,
+        .transcript-word-new,
+        .rubric-card
+      `)
     ).filter(el => !el.hasAttribute("disabled"));
 
-    // Skip any elements inside the header
+    // Ignore elemnts in page header
     const header = document.querySelector("header");
-    if (!header) return all;
+    if (header) {
+      all = all.filter(el => !header.contains(el));
+    }
 
-    return all.filter(el => !header.contains(el));
+    // Ignore elements in player header
+    const playerHeader = document.querySelector(".player-header-bar");
+    if (playerHeader) {
+      all = all.filter(el => !playerHeader.contains(el));
+    }
+
+    // Ignore elements in modal header
+    const modalHeader = document.querySelector(".modal-header");
+    if (modalHeader) {
+      all = all.filter(el => !modalHeader.contains(el));
+    }
+
+    return all;
   };
 
   /* 
@@ -127,8 +127,174 @@ export default function KeyboardProvider({
     const active = focusables[focusedIndex];
 
     active?.classList.add("focus-highlight");
-    active?.scrollIntoView({ block: "center" });
+
+    const scrollContainer = getActiveModalScrollContainer() 
+      ?? getTranscriptScrollContainer() ?? window;
+
+    scrollIntoViewIfNeeded(active!, scrollContainer);
   }, [isFocusMode, focusedIndex, focusables]);
+
+  /*
+   * Check if HTML element is visible
+   */
+  const isElementVisible = (el: HTMLElement) => {
+    const rect = el.getBoundingClientRect();
+    return (
+      rect.top < window.innerHeight &&
+      rect.bottom > 0 &&
+      rect.left < window.innerWidth &&
+      rect.right > 0
+    );
+  };
+
+  /*
+   * Get indicies of HTML elements that are focusable and visible
+   */
+  const getVisibleIndicies = (elements: HTMLElement[]) => {
+    return elements
+      .map((el, index) => ({ el, index}))
+      .filter(({ el }) => isElementVisible(el))
+      .map(({ index }) => index);
+  };
+
+  /*
+   * Scroll page if focused element is offscreen
+   */
+  const scrollIntoViewIfNeeded = (el: HTMLElement, container: HTMLElement | Window = window) => {
+    if (container instanceof Window) {
+      // Window scroll
+      const { topOffset, bottomOffset } = getViewportOffsets();
+      const rect = el.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+
+      if (rect.top < topOffset) {
+        window.scrollBy({ top: rect.top - topOffset, behavior: "smooth" });
+      } else if (rect.bottom > viewportHeight - bottomOffset) {
+        window.scrollBy({ top: rect.bottom - (viewportHeight - bottomOffset), behavior: "smooth" });
+      }
+    } else {
+      // Container scroll
+      const rect = el.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+
+      // Current scrollTop of container
+      const currentScroll = container.scrollTop;
+
+      // Element's offset from top of container
+      const offsetTop = rect.top - containerRect.top + currentScroll;
+
+      // Modal header height
+      const modalHeader = container.querySelector<HTMLElement>(".modal-header");
+      const headerHeight = modalHeader?.offsetHeight ?? 0;
+
+      // Scroll if element is behind modal header
+      if (rect.top < containerRect.top + headerHeight) {
+        const scrollTo = offsetTop - headerHeight;
+        container.scrollTo({ top: scrollTo, behavior: "smooth" });
+      } else if (rect.bottom > containerRect.bottom) {
+        // Optional: scroll if element goes below bottom of modal container
+        const scrollTo = offsetTop - container.clientHeight + rect.height;
+        container.scrollTo({ top: scrollTo, behavior: "smooth" });
+      }
+      // else element is visible → do nothing
+    }
+  };
+
+  /*
+   * Get header and hint bar offsets.
+   *
+   * For knowing when a focusable element is hidden 
+   * behind the page header or hint bar.
+   */
+  const getViewportOffsets = () => {
+    const header = document.querySelector<HTMLElement>(".site-header");
+    const hintBar = document.querySelector<HTMLElement>(".keyboard-hint-bar");
+
+    const topOffset = header?.offsetHeight ?? 0;
+    const bottomOffset = hintBar?.offsetHeight ?? 0;
+
+    return { topOffset, bottomOffset };
+  }
+
+  /*
+   * Update visible elements when screen moves
+   */
+  useEffect(() => {
+    if (!isFocusMode) return;
+
+    const handleScroll = () => {
+      const visible = getVisibleIndicies(focusables);
+
+      // Move to first visible focusable element
+      // if last focused index is offscreen
+      if (!isElementVisible(focusables[focusedIndex])) {
+        if (visible.length > 0) {
+          setFocusedIndex(visible[0]);
+        }
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [isFocusMode, focusables, focusedIndex]);
+
+  /*
+   * Reset focused index when route changes
+   */
+  useEffect(() => {
+    if (prevPathRef.current && prevPathRef.current !== pathname) {
+      // Clear stored focus index when leaving a screen
+      setLastFocusedByScope({});
+      setIsFocusMode(false);
+    }
+
+    prevPathRef.current = pathname;
+  }, [pathname]);
+
+  const getActiveModal = (): HTMLElement | null => {
+    return document.querySelector<HTMLElement>(
+      ".modal-overlay, .grading-modal-overlay, .rubric-selector-modal"
+    );
+  };
+
+  /*
+   * Get scroll container of modal
+   */
+  const getActiveModalScrollContainer = (): HTMLElement | null => {
+    // Try grading modal scroll container
+    const gradingBody = document.querySelector<HTMLElement>(".grading-modal-body");
+    if (gradingBody) return gradingBody;
+
+    // Try rubric modal scroll container
+    const rubricForm = document.querySelector<HTMLElement>(".rubric-form");
+    if (rubricForm) return rubricForm;
+
+    // Try rubric selector scroll container
+    const rubricSelector = document.querySelector<HTMLElement>(".rubric-selector-content");
+    if (rubricSelector) return rubricSelector;
+
+    return null;
+  };
+
+  /*
+   * Get scroll container for transcription page
+   */
+  const getTranscriptScrollContainer = (): HTMLElement | null => {
+    return document.querySelector<HTMLElement>(".transcript-content-new");
+  }
+
+  /*
+   * Get player screen buttons
+   */
+  const getPlayerActionButton = (label: string): HTMLButtonElement | null => {
+    const buttons = Array.from(
+      document.querySelectorAll<HTMLButtonElement>("button")
+    );
+
+    return buttons.find(
+      btn => btn.textContent?.trim() === label
+    ) ?? null;
+  };
 
   /* 
    * Keyboard handling
@@ -142,7 +308,9 @@ export default function KeyboardProvider({
         target.isContentEditable;
       const modal = getActiveModal();
 
-      // ESC Key
+      /*
+       * Escape Key
+       */
       if (e.key === KEYMAP.GLOBAL_BINDINGS.ESCAPE.key && !isFocusMode) {
         if (isTyping) {
           e.preventDefault();
@@ -155,8 +323,7 @@ export default function KeyboardProvider({
           e.preventDefault();
 
           // Close modal
-          const overlay = modal.parentElement;
-          overlay?.dispatchEvent(
+          modal?.dispatchEvent(
             new MouseEvent("click", { bubbles: true })
           );
 
@@ -167,8 +334,6 @@ export default function KeyboardProvider({
            return next;
           });
 
-          // Exit Focus Mode
-          setIsFocusMode(false);
           return;
         }
       }
@@ -239,20 +404,33 @@ export default function KeyboardProvider({
             setFocusedIndex(i => (i - 1 + focusables.length) % focusables.length);
             break;
 
-          case KEYMAP.FOCUS_MODE.TOP.key:
-            // Jump to first focusable element
-            setFocusedIndex(0);
+          case KEYMAP.FOCUS_MODE.TOP.key: {
+            // Jump to first visible focusable element
+            const visible = getVisibleIndicies(focusables);
+            if (visible.length > 0) {
+              setFocusedIndex(visible[0]);
+            }
             break;
+          }
 
-          case KEYMAP.FOCUS_MODE.MIDDLE.key:
-            // Jump to middle focusable element
-            setFocusedIndex(focusables.length/2);
+          case KEYMAP.FOCUS_MODE.MIDDLE.key: {
+            // Jump to middle visible focusable element
+            const visible = getVisibleIndicies(focusables);
+            if (visible.length > 0) {
+              const mid = Math.floor(visible.length / 2);
+              setFocusedIndex(visible[mid]);
+            }
             break;
+          }
 
-          case KEYMAP.FOCUS_MODE.BOTTOM.key:
-            // Jump to last focusable element
-            setFocusedIndex(focusables.length-1)
+          case KEYMAP.FOCUS_MODE.BOTTOM.key: {
+            // Jump to bottom visible focusable element
+            const visible = getVisibleIndicies(focusables);
+            if (visible.length > 0) {
+              setFocusedIndex(visible[visible.length - 1]);
+            }
             break;
+          }
 
           case KEYMAP.FOCUS_MODE.SELECT.key:
             // Save the last focused element
@@ -278,8 +456,11 @@ export default function KeyboardProvider({
         return;
       }
 
-      // Enter Focus Mode
-      if (e.key === KEYMAP.NORMAL_MODE.ENTER_FOCUS.key && !isTyping && !isFocusMode) {
+      /*
+       *  Entering Focus Mode
+       */
+      if (e.key === KEYMAP.NORMAL_MODE.ENTER_FOCUS.key 
+          && !isTyping && !isFocusMode) {
         e.preventDefault();
 
         const els = getFocusableElements();
@@ -290,25 +471,22 @@ export default function KeyboardProvider({
         const modal = getActiveModal();
         const scopeKey = modal ? 'modal' : pathname;
 
-        if (modal) {
-          const modalFocusables = els.filter(el => modal.contains(el));
-          setFocusables(modalFocusables);
-        
-          const savedIndex = lastFocusedByScope['modal'];
-          setFocusedIndex(
-            savedIndex !== undefined && savedIndex < modalFocusables.length
-            ? savedIndex
-            : 0
-          );
+        const savedIndex = lastFocusedByScope[scopeKey];
+
+        if (savedIndex !== undefined && savedIndex < els.length) {
+          // Entered Focus Mode at least once already on current page
+          if (isElementVisible(els[savedIndex])) {
+            // Jump to saved index if it is visible
+            setFocusedIndex(savedIndex);
+          } else {
+            // Otherwsie, fallback to first visible element
+            const visible = getVisibleIndicies(els);
+            setFocusedIndex(visible.length > 0 ? visible[0] : 0);
+          }
         } else {
-            setFocusables(els);
-        
-            const savedIndex = lastFocusedByScope[scopeKey];
-            setFocusedIndex(
-                savedIndex !== undefined && savedIndex < els.length
-                ? savedIndex
-                : 0
-            );
+          // First time entering Focus Mode on current page
+          const visible = getVisibleIndicies(els);
+          setFocusedIndex(visible.length > 0 ? visible[0] : 0);
         }
 
         setIsFocusMode(true);
@@ -351,6 +529,18 @@ export default function KeyboardProvider({
               ws.seekTo(Math.max(time / duration, 0));
             }
             break;
+
+          case KEYMAP.AUDIO_PLAYER.VIEW_GRADE.key: {
+            const btn = getPlayerActionButton("View Grading");
+            btn?.click();
+            break;
+          }
+
+          case KEYMAP.AUDIO_PLAYER.GRADE_PRES.key: {
+            const btn = getPlayerActionButton("Grade Presentation");
+            btn?.click();
+            break;
+          }
         }
       }
 
@@ -358,30 +548,34 @@ export default function KeyboardProvider({
          Page Navigation
       ========================================================= */
       if (!isTyping && !isFocusMode) {
+          const scrollContainer = getActiveModalScrollContainer() 
+            ?? getTranscriptScrollContainer() 
+            ?? document.scrollingElement ?? document.body;
+
         switch (e.key) {
           case KEYMAP.NORMAL_MODE.SCROLL_DOWN.key:
             e.preventDefault();
-            window.scrollBy({ top: 120, behavior: "smooth" });
+            scrollContainer.scrollBy({ top: 120, behavior: "smooth" });
             break;
 
           case KEYMAP.NORMAL_MODE.SCROLL_UP.key:
             e.preventDefault();
-            window.scrollBy({ top: -120, behavior: "smooth" });
+            scrollContainer.scrollBy({ top: -120, behavior: "smooth" });
             break;
 
           case KEYMAP.NORMAL_MODE.SCROLL_TOP.key:
             e.preventDefault();
-            window.scrollTo({ top: 0, behavior: "smooth" });
+            scrollContainer.scrollTo({ top: 0, behavior: "smooth" });
             break;
 
           case KEYMAP.NORMAL_MODE.SCROLL_MID.key:
             e.preventDefault();
-            window.scrollTo({ top: document.body.scrollHeight / 2, behavior: "smooth" });
+            scrollContainer.scrollTo({ top: document.body.scrollHeight / 2, behavior: "smooth" });
             break;
 
           case KEYMAP.NORMAL_MODE.SCROLL_BOT.key:
             e.preventDefault();
-            window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+            scrollContainer.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
             break;
         }
       }
