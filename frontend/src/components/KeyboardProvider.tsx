@@ -3,7 +3,10 @@
 /*
  * Issues:
  *  1. Odd behavior when focusing 'Close' and 'Delete' buttons in grading modal
- *  2. No way to change volume on player screen
+ *  2. isElementVisible does not account for modal header
+ *  3. No way to change volume on player screen
+ *  4. No way to filter results on library screen
+ *  5. z-index of focus-highlight must be below header and compact hint bar
  */
 
 import { useEffect, useState, useRef } from "react";
@@ -72,7 +75,7 @@ export default function KeyboardProvider({
   const [showKeybindings, setShowKeybindings] = useState(false);
 
   /* =========================================================
-     FOCUS MODE HELPERS
+     HELPERS
   ========================================================= */
 
   /*
@@ -92,7 +95,9 @@ export default function KeyboardProvider({
         .grading-card.completed, 
         .library-upload-dropzone,
         .transcript-word-new,
-        .rubric-card
+        .rubric-card,
+        .result-header,
+        .grading-dash-card
       `)
     ).filter(el => !el.hasAttribute("disabled"));
 
@@ -139,9 +144,15 @@ export default function KeyboardProvider({
    */
   const isElementVisible = (el: HTMLElement) => {
     const rect = el.getBoundingClientRect();
+    const { topOffset, bottomOffset } = getViewportOffsets();
+
+    console.log("rect.top: %d", rect.top);
+    console.log("window.innerHeight(%d) - topOffset(%d): %d", window.innerHeight, topOffset, window.innerHeight - topOffset);
+    console.log("rect.bottom: %d", rect.bottom);
+    console.log("bottomOffset: %d", bottomOffset);
     return (
-      rect.top < window.innerHeight &&
-      rect.bottom > 0 &&
+      rect.top < window.innerHeight - topOffset &&
+      rect.bottom > bottomOffset &&
       rect.left < window.innerWidth &&
       rect.right > 0
     );
@@ -394,15 +405,19 @@ export default function KeyboardProvider({
             setIsFocusMode(false);
             break;
 
-          case KEYMAP.FOCUS_MODE.NEXT.key:            
-            // Jump to next focusable element
-            setFocusedIndex(i => (i + 1) % focusables.length);
+          case KEYMAP.FOCUS_MODE.NEXT.key: {
+            // Jump to next visible focusable element
+            const visible = getVisibleIndicies(focusables);
+            setFocusedIndex(i => (i + 1) % visible.length);
             break;
+          }
 
-          case KEYMAP.FOCUS_MODE.PREV.key:            
-            // Jump to previous focusable element
-            setFocusedIndex(i => (i - 1 + focusables.length) % focusables.length);
+          case KEYMAP.FOCUS_MODE.PREV.key: {
+            // Jump to previous visible focusable element
+            const visible = getVisibleIndicies(focusables);
+            setFocusedIndex(i => (i - 1 + visible.length) % visible.length);
             break;
+          }
 
           case KEYMAP.FOCUS_MODE.TOP.key: {
             // Jump to first visible focusable element
@@ -619,7 +634,7 @@ export default function KeyboardProvider({
         <span className="hint-toggle">
           <span className="hint-text">Press</span>
           <kbd>{KEYMAP.GLOBAL_BINDINGS.SHOW_BINDS.key}</kbd>
-          <span className="hint-text">to view the full list of shortcuts</span>
+          <span className="hint-text">to toggle the full list of shortcuts</span>
         </span>
 
         <span className="hint-separator">•</span>
