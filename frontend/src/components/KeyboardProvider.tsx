@@ -97,7 +97,8 @@ export default function KeyboardProvider({
         .transcript-word-new,
         .rubric-card,
         .result-header,
-        .grading-dash-card
+        .grading-dash-card,
+        .class-card
       `)
     ).filter(el => !el.hasAttribute("disabled"));
 
@@ -140,19 +141,17 @@ export default function KeyboardProvider({
   }, [isFocusMode, focusedIndex, focusables]);
 
   /*
-   * Check if HTML element is visible
+   * Check if HTML element is visible .
+   * At least 2/3 of element height must appear between header and hint bar.
    */
   const isElementVisible = (el: HTMLElement) => {
     const rect = el.getBoundingClientRect();
     const { topOffset, bottomOffset } = getViewportOffsets();
+    const maxHiddenHeight = 0.33 * rect.height;
 
-    console.log("rect.top: %d", rect.top);
-    console.log("window.innerHeight(%d) - topOffset(%d): %d", window.innerHeight, topOffset, window.innerHeight - topOffset);
-    console.log("rect.bottom: %d", rect.bottom);
-    console.log("bottomOffset: %d", bottomOffset);
     return (
-      rect.top < window.innerHeight - topOffset &&
-      rect.bottom > bottomOffset &&
+      rect.top + maxHiddenHeight > topOffset &&
+      rect.bottom - maxHiddenHeight < window.innerHeight - bottomOffset &&
       rect.left < window.innerWidth &&
       rect.right > 0
     );
@@ -408,14 +407,34 @@ export default function KeyboardProvider({
           case KEYMAP.FOCUS_MODE.NEXT.key: {
             // Jump to next visible focusable element
             const visible = getVisibleIndicies(focusables);
-            setFocusedIndex(i => (i + 1) % visible.length);
+
+            setFocusedIndex(current => {
+              const curVisibleIndex = visible.indexOf(current);
+
+              const nextVisibleIndex =
+                curVisibleIndex === -1
+                ? 0
+                : (curVisibleIndex + 1) % visible.length;
+
+              return visible[nextVisibleIndex];
+            });
             break;
           }
 
           case KEYMAP.FOCUS_MODE.PREV.key: {
             // Jump to previous visible focusable element
             const visible = getVisibleIndicies(focusables);
-            setFocusedIndex(i => (i - 1 + visible.length) % visible.length);
+
+            setFocusedIndex(current => {
+              const curVisibleIndex = visible.indexOf(current);
+
+              const prevVisibleIndex =
+                curVisibleIndex === -1
+                ? visible.length - 1
+                : (curVisibleIndex - 1 + visible.length) % visible.length;
+
+              return visible[prevVisibleIndex];
+            });
             break;
           }
 
@@ -634,7 +653,7 @@ export default function KeyboardProvider({
         <span className="hint-toggle">
           <span className="hint-text">Press</span>
           <kbd>{KEYMAP.GLOBAL_BINDINGS.SHOW_BINDS.key}</kbd>
-          <span className="hint-text">to toggle the full list of shortcuts</span>
+          <span className="hint-text">to toggle the full list of keyboard shortcuts</span>
         </span>
 
         <span className="hint-separator">•</span>
