@@ -3,8 +3,13 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { motion } from 'motion/react';
 import { useAuth } from '@/contexts/AuthContext';
 import { API_URL } from '@/config';
+
+const HERO_BARS = [
+  22, 38, 52, 34, 68, 48, 82, 56, 72, 44, 90, 62, 76, 40, 58, 85, 50, 66, 36, 78, 54, 88, 46, 70, 32, 60, 94, 42, 74, 48, 64, 38,
+];
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -53,7 +58,10 @@ export default function LoginPage() {
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'Authentication failed');
-      if (data.requires_confirmation) { setMessage(data.message); return; }
+      if (data.requires_confirmation) {
+        setMessage(data.message);
+        return;
+      }
 
       await refreshAuth();
       router.push('/dashboard');
@@ -73,193 +81,151 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="split-auth">
-
-      {/* ── Background layers ── */}
-      <div className="split-auth__bg-image" aria-hidden="true" />
-      <div className="split-auth__grain" aria-hidden="true" />
-
-      {/* ── Ascending squares decoration ── */}
-      <svg className="split-auth__squares" viewBox="0 0 1200 800"
-        preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-
-        {/* Row 1 — y≈750, 18px, densest */}
-        <rect x="22"  y="750" width="18" height="18" rx="3" fill="#000" className="sq" style={{animationDelay:'0.0s',animationDuration:'2.8s'} as React.CSSProperties} />
-        <rect x="116" y="740" width="18" height="18" rx="3" fill="#000" className="sq" style={{animationDelay:'0.4s',animationDuration:'3.5s'} as React.CSSProperties} />
-        <rect x="212" y="753" width="18" height="18" rx="3" fill="#000" className="sq" style={{animationDelay:'1.1s',animationDuration:'2.5s'} as React.CSSProperties} />
-        <rect x="308" y="744" width="18" height="18" rx="3" fill="#000" className="sq" style={{animationDelay:'0.7s',animationDuration:'4.0s'} as React.CSSProperties} />
-        <rect x="404" y="756" width="18" height="18" rx="3" fill="#000" className="sq" style={{animationDelay:'1.8s',animationDuration:'3.2s'} as React.CSSProperties} />
-        <rect x="500" y="742" width="18" height="18" rx="3" fill="#000" className="sq" style={{animationDelay:'0.2s',animationDuration:'2.9s'} as React.CSSProperties} />
-        <rect x="596" y="751" width="18" height="18" rx="3" fill="#000" className="sq" style={{animationDelay:'1.4s',animationDuration:'3.7s'} as React.CSSProperties} />
-        <rect x="692" y="745" width="18" height="18" rx="3" fill="#000" className="sq" style={{animationDelay:'0.6s',animationDuration:'2.6s'} as React.CSSProperties} />
-        <rect x="788" y="753" width="18" height="18" rx="3" fill="#000" className="sq" style={{animationDelay:'2.1s',animationDuration:'4.2s'} as React.CSSProperties} />
-        <rect x="884" y="741" width="18" height="18" rx="3" fill="#000" className="sq" style={{animationDelay:'0.9s',animationDuration:'3.0s'} as React.CSSProperties} />
-        <rect x="980" y="750" width="18" height="18" rx="3" fill="#000" className="sq" style={{animationDelay:'1.6s',animationDuration:'2.7s'} as React.CSSProperties} />
-        <rect x="1076" y="743" width="18" height="18" rx="3" fill="#000" className="sq" style={{animationDelay:'0.3s',animationDuration:'3.8s'} as React.CSSProperties} />
-        <rect x="1162" y="752" width="18" height="18" rx="3" fill="#000" className="sq" style={{animationDelay:'1.2s',animationDuration:'3.1s'} as React.CSSProperties} />
-
-        {/* Row 2 — y≈645, 14px */}
-        <rect x="60"  y="647" width="14" height="14" rx="3" fill="#000" className="sq" style={{animationDelay:'2.3s',animationDuration:'3.4s'} as React.CSSProperties} />
-        <rect x="178" y="638" width="14" height="14" rx="3" fill="#000" className="sq" style={{animationDelay:'0.5s',animationDuration:'2.8s'} as React.CSSProperties} />
-        <rect x="298" y="651" width="14" height="14" rx="3" fill="#000" className="sq" style={{animationDelay:'1.7s',animationDuration:'4.1s'} as React.CSSProperties} />
-        <rect x="420" y="641" width="14" height="14" rx="3" fill="#000" className="sq" style={{animationDelay:'0.1s',animationDuration:'3.3s'} as React.CSSProperties} />
-        <rect x="544" y="649" width="14" height="14" rx="3" fill="#000" className="sq" style={{animationDelay:'2.6s',animationDuration:'2.6s'} as React.CSSProperties} />
-        <rect x="668" y="637" width="14" height="14" rx="3" fill="#000" className="sq" style={{animationDelay:'0.8s',animationDuration:'3.9s'} as React.CSSProperties} />
-        <rect x="792" y="646" width="14" height="14" rx="3" fill="#000" className="sq" style={{animationDelay:'1.3s',animationDuration:'2.9s'} as React.CSSProperties} />
-        <rect x="916" y="639" width="14" height="14" rx="3" fill="#000" className="sq" style={{animationDelay:'2.0s',animationDuration:'3.6s'} as React.CSSProperties} />
-        <rect x="1032" y="648" width="14" height="14" rx="3" fill="#000" className="sq" style={{animationDelay:'0.4s',animationDuration:'4.3s'} as React.CSSProperties} />
-        <rect x="1140" y="640" width="14" height="14" rx="3" fill="#000" className="sq" style={{animationDelay:'1.9s',animationDuration:'3.0s'} as React.CSSProperties} />
-
-        {/* Row 3 — y≈540, 12px */}
-        <rect x="40"  y="542" width="12" height="12" rx="2.5" fill="#000" className="sq" style={{animationDelay:'0.6s',animationDuration:'3.2s'} as React.CSSProperties} />
-        <rect x="178" y="532" width="12" height="12" rx="2.5" fill="#000" className="sq" style={{animationDelay:'2.4s',animationDuration:'2.7s'} as React.CSSProperties} />
-        <rect x="320" y="546" width="12" height="12" rx="2.5" fill="#000" className="sq" style={{animationDelay:'1.0s',animationDuration:'4.0s'} as React.CSSProperties} />
-        <rect x="464" y="536" width="12" height="12" rx="2.5" fill="#000" className="sq" style={{animationDelay:'0.2s',animationDuration:'3.5s'} as React.CSSProperties} />
-        <rect x="614" y="543" width="12" height="12" rx="2.5" fill="#000" className="sq" style={{animationDelay:'1.8s',animationDuration:'2.9s'} as React.CSSProperties} />
-        <rect x="768" y="533" width="12" height="12" rx="2.5" fill="#000" className="sq" style={{animationDelay:'3.1s',animationDuration:'3.8s'} as React.CSSProperties} />
-        <rect x="922" y="542" width="12" height="12" rx="2.5" fill="#000" className="sq" style={{animationDelay:'0.7s',animationDuration:'3.1s'} as React.CSSProperties} />
-        <rect x="1068" y="535" width="12" height="12" rx="2.5" fill="#000" className="sq" style={{animationDelay:'2.2s',animationDuration:'4.4s'} as React.CSSProperties} />
-
-        {/* Row 4 — y≈432, 10px */}
-        <rect x="95"  y="434" width="10" height="10" rx="2" fill="#000" className="sq" style={{animationDelay:'1.5s',animationDuration:'3.6s'} as React.CSSProperties} />
-        <rect x="258" y="422" width="10" height="10" rx="2" fill="#000" className="sq" style={{animationDelay:'0.3s',animationDuration:'2.8s'} as React.CSSProperties} />
-        <rect x="430" y="436" width="10" height="10" rx="2" fill="#000" className="sq" style={{animationDelay:'2.7s',animationDuration:'4.1s'} as React.CSSProperties} />
-        <rect x="608" y="426" width="10" height="10" rx="2" fill="#000" className="sq" style={{animationDelay:'0.9s',animationDuration:'3.3s'} as React.CSSProperties} />
-        <rect x="790" y="435" width="10" height="10" rx="2" fill="#000" className="sq" style={{animationDelay:'1.4s',animationDuration:'2.6s'} as React.CSSProperties} />
-        <rect x="968" y="424" width="10" height="10" rx="2" fill="#000" className="sq" style={{animationDelay:'3.3s',animationDuration:'3.9s'} as React.CSSProperties} />
-        <rect x="1130" y="432" width="10" height="10" rx="2" fill="#000" className="sq" style={{animationDelay:'0.5s',animationDuration:'3.0s'} as React.CSSProperties} />
-
-        {/* Row 5 — y≈328, 8px */}
-        <rect x="130" y="330" width="8" height="8" rx="2" fill="#000" className="sq" style={{animationDelay:'1.1s',animationDuration:'3.7s'} as React.CSSProperties} />
-        <rect x="330" y="320" width="8" height="8" rx="2" fill="#000" className="sq" style={{animationDelay:'2.8s',animationDuration:'2.9s'} as React.CSSProperties} />
-        <rect x="540" y="332" width="8" height="8" rx="2" fill="#000" className="sq" style={{animationDelay:'0.4s',animationDuration:'4.2s'} as React.CSSProperties} />
-        <rect x="755" y="322" width="8" height="8" rx="2" fill="#000" className="sq" style={{animationDelay:'1.9s',animationDuration:'3.4s'} as React.CSSProperties} />
-        <rect x="960" y="330" width="8" height="8" rx="2" fill="#000" className="sq" style={{animationDelay:'3.5s',animationDuration:'2.7s'} as React.CSSProperties} />
-
-        {/* Row 6 — y≈225, 7px */}
-        <rect x="185" y="227" width="7" height="7" rx="1.5" fill="#000" className="sq" style={{animationDelay:'0.8s',animationDuration:'3.8s'} as React.CSSProperties} />
-        <rect x="440" y="218" width="7" height="7" rx="1.5" fill="#000" className="sq" style={{animationDelay:'2.5s',animationDuration:'3.2s'} as React.CSSProperties} />
-        <rect x="700" y="224" width="7" height="7" rx="1.5" fill="#000" className="sq" style={{animationDelay:'1.2s',animationDuration:'4.5s'} as React.CSSProperties} />
-        <rect x="960" y="216" width="7" height="7" rx="1.5" fill="#000" className="sq" style={{animationDelay:'3.8s',animationDuration:'3.1s'} as React.CSSProperties} />
-
-        {/* Row 7 — y≈128, 6px */}
-        <rect x="260" y="130" width="6" height="6" rx="1.5" fill="#000" className="sq" style={{animationDelay:'1.6s',animationDuration:'3.9s'} as React.CSSProperties} />
-        <rect x="600" y="122" width="6" height="6" rx="1.5" fill="#000" className="sq" style={{animationDelay:'0.2s',animationDuration:'4.6s'} as React.CSSProperties} />
-        <rect x="940" y="128" width="6" height="6" rx="1.5" fill="#000" className="sq" style={{animationDelay:'2.9s',animationDuration:'3.3s'} as React.CSSProperties} />
-
-        {/* Row 8 — y≈45, 5px, sparsest */}
-        <rect x="380" y="47" width="5" height="5" rx="1" fill="#000" className="sq" style={{animationDelay:'1.0s',animationDuration:'4.8s'} as React.CSSProperties} />
-        <rect x="800" y="42" width="5" height="5" rx="1" fill="#000" className="sq" style={{animationDelay:'3.2s',animationDuration:'4.0s'} as React.CSSProperties} />
-      </svg>
-
-      {/* ── Form panel ── */}
-      <div className="split-auth__left">
-        <div className="split-auth__card">
-
-          {/* Logo */}
-          <div className="split-auth__logo">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF8200"
-              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-            </svg>
-            <span>SpeakWell</span>
-          </div>
-
-          {/* Header */}
-          <div className="split-auth__header">
-            <h1>{isSignup ? 'Create your account.' : 'Welcome back.'}</h1>
-            <p>{isSignup ? 'Start grading every word.' : 'Sign in to your account to continue.'}</p>
-          </div>
-
-          {error && <div className="split-auth__alert split-auth__alert--error">{error}</div>}
-          {message && <div className="split-auth__alert split-auth__alert--success">{message}</div>}
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="split-auth__form">
-            {isSignup && (
-              <div className="split-auth__field">
-                <label htmlFor="name">Name</label>
-                <input
-                  id="name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your name"
-                  className="split-auth__input"
-                />
-              </div>
-            )}
-
-            <div className="split-auth__field">
-              <label htmlFor="email">Email address</label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={handleEmailChange}
-                placeholder="you@example.com"
-                required
-                className={`split-auth__input${emailTouched && emailError ? ' split-auth__input--error' : ''}`}
-              />
-              {emailTouched && emailError && (
-                <span className="split-auth__field-error">{emailError}</span>
-              )}
-            </div>
-
-            <div className="split-auth__field">
-              <label htmlFor="password">Password</label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                minLength={6}
-                className="split-auth__input"
-              />
-            </div>
-
-            <button type="submit" disabled={loading} className="split-auth__submit">
-              {loading ? (
-                <span className="split-auth__spinner" />
-              ) : (
-                <>
-                  {isSignup ? 'Create account' : 'Sign in'}
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Toggle */}
-          <div className="split-auth__toggle">
-            <span>{isSignup ? 'Already have an account?' : 'New to SpeakWell?'}</span>
-            <button type="button" onClick={handleToggle}>
-              {isSignup ? 'Sign in' : 'Create an account →'}
-            </button>
-          </div>
-
-          {/* Footer */}
-          <p className="split-auth__footer">
-            By continuing, you agree to our <Link href="/terms">Terms of Service</Link>.
-          </p>
-
-          {/* Back to home */}
-          <Link href="/" className="split-auth__back">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
-            Back to home
-          </Link>
-
-        </div>
+    <div className="landing-root auth-page">
+      <div className="landing-bg" aria-hidden="true">
+        <div className="landing-bg-grid" />
+        <div className="landing-bg-orb landing-bg-orb-1" />
+        <div className="landing-bg-orb landing-bg-orb-2" />
+        <div className="landing-bg-orb landing-bg-orb-3" />
       </div>
 
+      <div className="auth-split">
+        <aside className="auth-hero">
+          <div className="auth-hero-glow" aria-hidden="true" />
+          <motion.div
+            className="auth-hero-inner"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, ease: [0.4, 0, 0.2, 1] }}
+          >
+            <div className="auth-hero-visual" aria-hidden="true">
+              <svg className="auth-hero-ring" viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="160" cy="160" r="148" stroke="rgba(255,130,0,0.12)" strokeWidth="1" />
+                <circle cx="160" cy="160" r="118" stroke="rgba(255,130,0,0.18)" strokeWidth="1" />
+                <circle cx="160" cy="160" r="88" stroke="rgba(255,244,239,0.06)" strokeWidth="1" />
+              </svg>
+              <div className="auth-hero-bars">
+                {HERO_BARS.map((h, i) => (
+                  <span
+                    key={i}
+                    className="auth-hero-bar"
+                    style={{ height: `${h}%`, animationDelay: `${i * 0.04}s` }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="auth-hero-copy">
+              <p className="auth-hero-tagline">
+                <span className="auth-hero-tagline-white">Master the </span>
+                <span className="auth-hero-tagline-accent">Art of Speech</span>
+                <span className="auth-hero-tagline-white"> with SpeakWell</span>
+              </p>
+            </div>
+          </motion.div>
+        </aside>
+
+        <div className="auth-panel">
+          <div className="auth-panel-top">
+            <Link href="/" className="auth-panel-link">
+              Home
+            </Link>
+          </div>
+
+          <main className="auth-main">
+            <motion.div
+              className="auth-card"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.06, duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <div className="auth-card-header">
+                <h1 className="auth-card-title">{isSignup ? 'Create your account' : 'Sign in'}</h1>
+                <p className="auth-card-subtitle">
+                  {isSignup
+                    ? 'Upload audio, get rubric scoring and AI feedback.'
+                    : 'Continue to your library and analytics.'}
+                </p>
+              </div>
+
+              {error && <div className="auth-alert auth-alert--error">{error}</div>}
+              {message && <div className="auth-alert auth-alert--success">{message}</div>}
+
+              <form onSubmit={handleSubmit} className="auth-form">
+                {isSignup && (
+                  <div className="auth-field">
+                    <label htmlFor="name">Name</label>
+                    <input
+                      id="name"
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Your name"
+                      className="auth-input"
+                      autoComplete="name"
+                    />
+                  </div>
+                )}
+
+                <div className="auth-field">
+                  <label htmlFor="email">Email</label>
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={handleEmailChange}
+                    placeholder="you@example.com"
+                    required
+                    className={`auth-input${emailTouched && emailError ? ' auth-input--error' : ''}`}
+                    autoComplete="email"
+                  />
+                  {emailTouched && emailError && <span className="auth-field-error">{emailError}</span>}
+                </div>
+
+                <div className="auth-field">
+                  <label htmlFor="password">Password</label>
+                  <input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    minLength={6}
+                    className="auth-input"
+                    autoComplete={isSignup ? 'new-password' : 'current-password'}
+                  />
+                </div>
+
+                <button type="submit" disabled={loading} className="auth-submit">
+                  {loading ? (
+                    <span className="auth-spinner" aria-hidden="true" />
+                  ) : (
+                    <>
+                      {isSignup ? 'Create account' : 'Sign in'}
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12h14M12 5l7 7-7 7" />
+                      </svg>
+                    </>
+                  )}
+                </button>
+              </form>
+
+              <div className="auth-toggle">
+                <span>{isSignup ? 'Already have an account?' : 'New to SpeakWell?'}</span>
+                <button type="button" onClick={handleToggle}>
+                  {isSignup ? 'Sign in' : 'Create an account'}
+                </button>
+              </div>
+
+              <p className="auth-footer-note">
+                By continuing, you agree to our{' '}
+                <Link href="/terms">Terms of Service</Link>.
+              </p>
+            </motion.div>
+          </main>
+        </div>
+      </div>
     </div>
   );
 }
