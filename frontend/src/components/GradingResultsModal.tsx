@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useConfirm } from '@/contexts/ConfirmContext';
 import { Grading } from '@/types/grading';
 import './GradingResultsModal.css';
 
@@ -19,6 +20,7 @@ export default function GradingResultsModal({
   onDelete,
   currentUserId
 }: GradingResultsModalProps) {
+  const confirm = useConfirm();
   const [selectedGradingIndex, setSelectedGradingIndex] = useState(0);
   const [activeView, setActiveView] = useState<ViewTab>('overview');
   const [isDeleting, setIsDeleting] = useState(false);
@@ -47,9 +49,15 @@ export default function GradingResultsModal({
 
   const handleDelete = useCallback(async () => {
     if (!currentGrading || isDeleting) return;
-    
-    const confirmed = window.confirm('Delete this grading? This cannot be undone.');
-    if (!confirmed) return;
+
+    const ok = await confirm({
+      title: 'Delete grading',
+      message: 'Delete this grading? This cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     setIsDeleting(true);
     try {
@@ -57,7 +65,7 @@ export default function GradingResultsModal({
     } finally {
       setIsDeleting(false);
     }
-  }, [currentGrading, isDeleting, onDelete]);
+  }, [confirm, currentGrading, isDeleting, onDelete]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') onClose();

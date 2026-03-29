@@ -357,7 +357,7 @@ export default function Dashboard() {
   if (loading || !isAuthenticated) return null;
 
   return (
-    <main className="home-dashboard">
+    <main className="home-dashboard studio-surface">
       <div className="dashboard-hero">
         {user?.role && <span className="hero-role-badge">{user.role}</span>}
         <h1>

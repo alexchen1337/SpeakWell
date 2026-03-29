@@ -2841,12 +2841,6 @@ input, select, textarea {
   cursor: not-allowed;
 }
 
-.role-updating {
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-  font-style: italic;
-}
-
 /* Rubric Management Styles */
 .rubric-section-header {
   display: flex;

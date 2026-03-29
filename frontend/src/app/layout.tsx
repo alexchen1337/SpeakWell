@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ConfirmProvider } from "@/contexts/ConfirmContext";
 import Header from "@/components/Header";
+import { AppToaster } from "@/components/AppToaster";
 import "../styles/tokens.css";
 import "./globals.css";
 import "../styles/library.css";
 import "../styles/studio-pages.css";
+import "../styles/studio-surface.css";
 
 export const metadata: Metadata = {
   title: "SpeakWell",
@@ -28,8 +31,11 @@ export default function RootLayout({
       </head>
       <body suppressHydrationWarning>
         <AuthProvider>
-          <Header />
-          {children}
+          <ConfirmProvider>
+            <Header />
+            {children}
+            <AppToaster />
+          </ConfirmProvider>
         </AuthProvider>
       </body>
     </html>
