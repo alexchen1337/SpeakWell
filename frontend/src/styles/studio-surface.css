@@ -1,0 +1,392 @@
+/* Library B–aligned surface for Dashboard, Analytics, Classes, Search, Class detail.
+   Loads after studio-pages.css so these tokens win. */
+
+.studio-surface {
+  --studio-bg: #0e0e0c;
+  --studio-panel: #161614;
+  --studio-panel-elevated: #111110;
+  --studio-border: #222220;
+  --studio-border-subtle: #1d1d1a;
+  background: var(--studio-bg);
+  color: #f4f3ef;
+}
+
+.studio-surface .btn-primary {
+  background: #ff8200;
+  color: #0e0e0c;
+  border-color: transparent;
+}
+
+.studio-surface .btn-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.studio-surface .btn-secondary {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  color: #f4f3ef;
+}
+
+.studio-surface .btn-secondary:hover:not(:disabled) {
+  border-color: rgba(255, 130, 0, 0.28);
+}
+
+/* ---- Dashboard ---- */
+.studio-surface.home-dashboard {
+  background: var(--studio-bg);
+}
+
+.studio-surface .dashboard-hero {
+  max-width: 1200px;
+  margin: 2rem auto 0;
+  padding: 2.5rem 2rem;
+  border-radius: 12px;
+  border: 1px solid var(--studio-border);
+  background: var(--studio-panel);
+  border-bottom: 1px solid var(--studio-border-subtle);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  background-image: none;
+}
+
+.studio-surface .dashboard-hero::after {
+  display: none;
+}
+
+.studio-surface .dashboard-content {
+  padding: 2rem 1.5rem 3rem;
+}
+
+.studio-surface .dash-stat-card {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.studio-surface .dash-stat-icon {
+  background: rgba(255, 130, 0, 0.12);
+  border: 1px solid rgba(255, 130, 0, 0.2);
+}
+
+.studio-surface .charts-row {
+  gap: 1.25rem;
+}
+
+.studio-surface .chart-card {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.studio-surface .chart-card-header h3,
+.studio-surface .chart-card-header p {
+  color: inherit;
+}
+
+.studio-surface .chart-card-header p {
+  color: rgba(244, 243, 239, 0.45);
+}
+
+.studio-surface .criteria-panel {
+  gap: 0.65rem;
+}
+
+.studio-surface .criterion-row {
+  border-radius: 8px;
+  padding: 4px 0;
+}
+
+.studio-surface .criterion-bar-track {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.studio-surface .dash-empty-chart,
+.studio-surface .empty-recent {
+  border: 1px dashed var(--studio-border);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.studio-surface .grading-dash-card {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.studio-surface .grading-dash-card:hover {
+  border-color: rgba(255, 130, 0, 0.22);
+  background: rgba(255, 130, 0, 0.06);
+  transform: translateY(-1px);
+}
+
+.studio-surface .dash-ring-bg {
+  stroke: rgba(255, 255, 255, 0.08);
+}
+
+.studio-surface .class-dash-card {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+}
+
+.studio-surface .class-dash-card:hover {
+  border-color: rgba(255, 130, 0, 0.22);
+}
+
+.studio-surface .class-dash-icon {
+  background: rgba(255, 130, 0, 0.1);
+  border: 1px solid rgba(255, 130, 0, 0.18);
+}
+
+.studio-surface .view-all-btn {
+  border-color: var(--studio-border);
+  color: rgba(244, 243, 239, 0.65);
+}
+
+.studio-surface .view-all-btn:hover {
+  border-color: rgba(255, 130, 0, 0.35);
+  color: #ff8200;
+  background: rgba(255, 130, 0, 0.08);
+}
+
+/* ---- Analytics ---- */
+.studio-surface .analytics-fire-header,
+.studio-surface .analytics-fire-header.app-header {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: none;
+}
+
+.studio-surface .analytics-fire-header p {
+  color: rgba(244, 243, 239, 0.5);
+}
+
+.studio-surface .analytics-fire-stat-card {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.studio-surface .analytics-fire-stat-icon {
+  background: rgba(255, 130, 0, 0.1);
+  border: 1px solid rgba(255, 130, 0, 0.18);
+}
+
+.studio-surface .analytics-fire-card {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.studio-surface .analytics-fire-empty-chart {
+  border: 1px dashed var(--studio-border);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.studio-surface .analytics-fire-criterion-track {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.studio-surface .analytics-fire-recent-pill {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 999px;
+}
+
+.studio-surface .analytics-fire-recent-pill:hover {
+  border-color: rgba(255, 130, 0, 0.3);
+  background: rgba(255, 130, 0, 0.06);
+}
+
+.studio-surface .filter-pill {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  color: rgba(244, 243, 239, 0.65);
+  border-radius: 8px;
+}
+
+.studio-surface .filter-pill:hover {
+  border-color: rgba(255, 130, 0, 0.25);
+}
+
+.studio-surface .filter-pill.active {
+  background: rgba(255, 130, 0, 0.12);
+  border-color: rgba(255, 130, 0, 0.35);
+  color: #ff8200;
+}
+
+.studio-surface .grading-card {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.studio-surface .grading-card:hover {
+  border-color: rgba(255, 130, 0, 0.25);
+}
+
+.studio-surface .empty-state {
+  border: 1px dashed var(--studio-border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.studio-surface .pagination-btn,
+.studio-surface .pagination-page {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 8px;
+}
+
+.studio-surface .pagination-page.active {
+  background: rgba(255, 130, 0, 0.15);
+  border-color: rgba(255, 130, 0, 0.35);
+  color: #ff8200;
+}
+
+.studio-surface .btn-primary.btn-small,
+.studio-surface .btn-secondary.btn-small {
+  border-radius: 8px;
+}
+
+/* ---- Classes ---- */
+.studio-surface .classes-header {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: none;
+}
+
+.studio-surface .classes-subtitle {
+  color: rgba(244, 243, 239, 0.5);
+}
+
+.studio-surface .class-card {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.studio-surface .class-card:hover {
+  border-color: rgba(255, 130, 0, 0.25);
+  transform: translateY(-1px);
+}
+
+.studio-surface .create-class-form,
+.studio-surface .join-class-section {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.studio-surface .join-class-form .join-code-input,
+.studio-surface .create-class-form input,
+.studio-surface .create-class-form textarea {
+  background: rgba(14, 14, 12, 0.6);
+  border: 1px solid var(--studio-border);
+  border-radius: 8px;
+  color: #f4f3ef;
+}
+
+.studio-surface .empty-classes,
+.studio-surface .role-prompt-card {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 12px;
+}
+
+.studio-surface .class-detail-header {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.studio-surface .class-tabs-container,
+.studio-surface .upload-section,
+.studio-surface .presentations-table-container,
+.studio-surface .students-list,
+.studio-surface .class-stats-summary {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.studio-surface .presentation-row {
+  border-color: var(--studio-border-subtle);
+}
+
+.studio-surface .tab-button {
+  border-radius: 8px;
+}
+
+.studio-surface .tab-button.active {
+  background: rgba(255, 130, 0, 0.12);
+  border-color: rgba(255, 130, 0, 0.3);
+  color: #ff8200;
+}
+
+/* ---- Search ---- */
+.studio-surface.studio-search .app-header,
+.studio-surface .studio-search .app-header {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: none;
+}
+
+.studio-surface .search-form {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.studio-surface .search-input-main {
+  background: rgba(14, 14, 12, 0.55);
+  border: 1px solid var(--studio-border);
+  border-radius: 8px;
+  color: #f4f3ef;
+}
+
+.studio-surface .search-button {
+  background: #ff8200;
+  color: #0e0e0c;
+  border-radius: 8px;
+  border: none;
+}
+
+.studio-surface .search-result-card,
+.studio-surface .search-status,
+.studio-surface .search-empty,
+.studio-surface .search-placeholder {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.studio-surface .result-match:hover {
+  background: rgba(255, 130, 0, 0.06);
+}
+
+.studio-surface .search-highlight,
+.studio-surface mark.search-highlight {
+  background: rgba(255, 130, 0, 0.28);
+  color: #f4f3ef;
+}

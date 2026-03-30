@@ -144,7 +144,7 @@ export default function SearchPage() {
   }
 
   return (
-    <main className="app-container studio-search">
+    <main className="app-container studio-search studio-surface">
       <header className="app-header">
         <h1>Search transcripts</h1>
         <p>Find specific words or phrases across all your audio files</p>

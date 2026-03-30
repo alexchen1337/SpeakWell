@@ -3,14 +3,18 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useConfirm } from '@/contexts/ConfirmContext';
 import { authService } from '@/services/auth';
 import { rubricAPI } from '@/services/api';
 import { Rubric, RubricCriterionRequest } from '@/types/grading';
 import RubricEditorModal from '@/components/RubricEditorModal';
+import { toast } from 'sonner';
+import '@/styles/profile.css';
 
 export default function ProfilePage() {
   const router = useRouter();
   const { user, isAuthenticated, loading, logout, refreshUser } = useAuth();
+  const confirm = useConfirm();
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState('');
   const [updating, setUpdating] = useState(false);
@@ -84,8 +88,15 @@ export default function ProfilePage() {
   };
 
   const handleDeleteRubric = async (rubricId: string) => {
-    if (!confirm('Are you sure you want to delete this rubric?')) return;
-    
+    const ok = await confirm({
+      title: 'Delete rubric',
+      message: 'Are you sure you want to delete this rubric?',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
     try {
       await rubricAPI.delete(rubricId);
       setRubricSuccess('Rubric deleted successfully');
@@ -137,57 +148,68 @@ export default function ProfilePage() {
 
   const handleRoleChange = async (newRole: 'student' | 'instructor') => {
     if (newRole === user.role) return;
-    
+
     setUpdatingRole(true);
-    setError(null);
 
     try {
       await authService.updateRole(newRole);
       await refreshUser();
-      setSuccess(`Role updated to ${newRole}`);
-      setTimeout(() => setSuccess(null), 3000);
+      toast.success(`Role updated to ${newRole}`, { duration: 1500 });
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to update role');
+      toast.error(err.response?.data?.detail || 'Failed to update role');
     } finally {
       setUpdatingRole(false);
     }
   };
 
   return (
-    <main className="app-container">
-      <div className="profile-container">
-        <div className="profile-header">
-          <div className="profile-avatar-large">
-            <img 
-              src={`https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(user.email)}`} 
-              alt="Profile" 
-            />
+    <main className="profile-page studio-surface">
+      <div className="profile-stack">
+      <div className="profile-hero">
+        <div className="profile-hero-content">
+          <div className="profile-avatar-ring">
+            <div className="profile-avatar-large">
+              <img
+                src={`https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(user.email)}`}
+                alt="Profile"
+              />
+            </div>
           </div>
-          <h1>{user.name}</h1>
-          <p className="profile-email">{user.email}</p>
+          <div className="profile-hero-text">
+            <h1>{user.name}</h1>
+            <span className="profile-email">{user.email}</span>
+            {user.role && (
+              <span className="profile-role-pill">
+                {user.role === 'instructor' ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 4 3 6 3s6-1 6-3v-5"/></svg>
+                )}
+                {user.role}
+              </span>
+            )}
+          </div>
         </div>
+      </div>
 
-        <div className="profile-card">
-          <h2>Account details</h2>
-          
-          {error && (
-            <div className="profile-message error-message-profile">
-              {error}
-            </div>
-          )}
-          
-          {success && (
-            <div className="profile-message success-message-profile">
-              {success}
-            </div>
-          )}
-          
-          <div className="profile-info-grid">
-            <div className="profile-info-item">
+      <div className="profile-body">
+        {(error || success) && (
+          <div className={`profile-toast ${error ? 'profile-toast--error' : 'profile-toast--success'}`}>
+            {error || success}
+          </div>
+        )}
+
+        <section className="profile-section">
+          <div className="profile-section-label">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Account
+          </div>
+          <div className="profile-fields">
+            <div className="profile-field">
               <label>Email</label>
               <p>{user.email}</p>
             </div>
-            <div className="profile-info-item">
+            <div className="profile-field">
               <label>Name</label>
               {isEditingName ? (
                 <div className="name-edit-container">
@@ -229,103 +251,119 @@ export default function ProfilePage() {
                 </div>
               )}
             </div>
-            <div className="profile-info-item">
+            <div className="profile-field">
               <label>Role</label>
-              <div className="role-select-container">
-                <select
-                  value={user.role || ''}
-                  onChange={(e) => handleRoleChange(e.target.value as 'student' | 'instructor')}
+              <div className="role-toggle-group">
+                <button
+                  className={`role-toggle-btn ${user.role === 'student' ? 'active' : ''}`}
+                  onClick={() => handleRoleChange('student')}
                   disabled={updatingRole}
-                  className="role-select"
                 >
-                  <option value="" disabled>Select your role</option>
-                  <option value="student">Student</option>
-                  <option value="instructor">Instructor</option>
-                </select>
-                {updatingRole && <span className="role-updating">Updating...</span>}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 4 3 6 3s6-1 6-3v-5"/></svg>
+                  Student
+                </button>
+                <button
+                  className={`role-toggle-btn ${user.role === 'instructor' ? 'active' : ''}`}
+                  onClick={() => handleRoleChange('instructor')}
+                  disabled={updatingRole}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                  Instructor
+                </button>
               </div>
             </div>
             {user.organization && (
-              <div className="profile-info-item">
+              <div className="profile-field">
                 <label>Organization</label>
                 <p>{user.organization}</p>
               </div>
             )}
             {user.group && (
-              <div className="profile-info-item">
+              <div className="profile-field">
                 <label>Group</label>
                 <p>{user.group}</p>
               </div>
             )}
           </div>
-        </div>
+        </section>
 
-        {/* Custom Rubrics Section */}
-        <div className="profile-card">
-          <div className="rubric-section-header">
-            <h2>Custom Grading Rubrics</h2>
-            <button onClick={handleCreateRubric} className="btn-primary btn-small">
-              + Create Rubric
-            </button>
+        <section className="profile-section">
+          <div className="profile-section-label">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            Custom Rubrics
           </div>
-          
+
           {rubricError && (
-            <div className="profile-message error-message-profile">
-              {rubricError}
-            </div>
+            <div className="profile-toast profile-toast--error">{rubricError}</div>
           )}
-          
           {rubricSuccess && (
-            <div className="profile-message success-message-profile">
-              {rubricSuccess}
-            </div>
+            <div className="profile-toast profile-toast--success">{rubricSuccess}</div>
           )}
 
           {loadingRubrics ? (
             <div className="rubric-list">
               {[1, 2].map(i => (
                 <div key={i} className="rubric-item skeleton">
-                  <div className="skeleton-line" style={{ height: '20px', width: '60%', marginBottom: '0.5rem' }}></div>
-                  <div className="skeleton-line" style={{ height: '14px', width: '80%', marginBottom: '0.5rem' }}></div>
-                  <div className="skeleton-line" style={{ height: '12px', width: '40%' }}></div>
+                  <div className="skeleton-line" style={{ height: '20px', width: '60%', marginBottom: '0.5rem' }} />
+                  <div className="skeleton-line" style={{ height: '14px', width: '80%', marginBottom: '0.5rem' }} />
+                  <div className="skeleton-line" style={{ height: '12px', width: '40%' }} />
                 </div>
               ))}
             </div>
           ) : customRubrics.length === 0 ? (
-            <div className="empty-rubrics">
-              <p>No custom rubrics yet. Create one to use for grading presentations.</p>
+            <div className="profile-empty-rubrics">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+              </svg>
+              <p>No custom rubrics yet</p>
+              <button onClick={handleCreateRubric} className="btn-primary btn-small">
+                + Create your first rubric
+              </button>
             </div>
           ) : (
-            <div className="rubric-list">
-              {customRubrics.map(rubric => (
-                <div key={rubric.id} className="rubric-item">
-                  <div className="rubric-info">
-                    <h3>{rubric.name}</h3>
-                    {rubric.description && <p>{rubric.description}</p>}
-                    <span className="criteria-count">{rubric.criteria.length} criteria</span>
+            <>
+              <div className="rubric-list">
+                {customRubrics.map(rubric => (
+                  <div key={rubric.id} className="rubric-item">
+                    <div className="rubric-info">
+                      <h3>{rubric.name}</h3>
+                      {rubric.description && <p>{rubric.description}</p>}
+                      <span className="criteria-count">{rubric.criteria.length} criteria</span>
+                    </div>
+                    <div className="rubric-actions">
+                      <button onClick={() => handleEditRubric(rubric)} className="btn-edit">
+                        Edit
+                      </button>
+                      <button onClick={() => handleDeleteRubric(rubric.id)} className="btn-danger btn-small">
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                  <div className="rubric-actions">
-                    <button onClick={() => handleEditRubric(rubric)} className="btn-edit">
-                      Edit
-                    </button>
-                    <button onClick={() => handleDeleteRubric(rubric.id)} className="btn-danger btn-small">
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+              <button onClick={handleCreateRubric} className="profile-add-rubric-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                New rubric
+              </button>
+            </>
           )}
-        </div>
+        </section>
 
-        <div className="profile-actions">
+        <div className="profile-footer">
           <button onClick={() => router.push('/')} className="btn-secondary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
             Back to library
           </button>
-          <button onClick={logout} className="btn-danger">
+          <button onClick={logout} className="profile-signout-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
             Sign out
           </button>
         </div>
+      </div>
       </div>
 
       {showRubricEditor && (

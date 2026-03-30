@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useConfirm } from '@/contexts/ConfirmContext';
 import { gradingAPI, rubricAPI } from '@/services/api';
 import { Grading, Rubric } from '@/types/grading';
 import GradingResultsModal from '@/components/GradingResultsModal';
@@ -186,6 +187,7 @@ function ScoreTrendChart({ data }: { data: Grading[] }) {
 export default function AnalyticsPage() {
   const router = useRouter();
   const { user, isAuthenticated, loading } = useAuth();
+  const confirm = useConfirm();
 
   const [gradings, setGradings] = useState<Grading[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -277,18 +279,28 @@ export default function AnalyticsPage() {
     [editingRubric, loadRubrics]
   );
 
-  const handleDeleteRubric = useCallback(async (id: string) => {
-    if (!confirm('Are you sure you want to delete this rubric?')) return;
+  const handleDeleteRubric = useCallback(
+    async (id: string) => {
+      const ok = await confirm({
+        title: 'Delete rubric',
+        message: 'Are you sure you want to delete this rubric?',
+        confirmLabel: 'Delete',
+        cancelLabel: 'Cancel',
+        variant: 'danger',
+      });
+      if (!ok) return;
 
-    try {
-      await rubricAPI.delete(id);
-      setRubrics((prev) => prev.filter((rubric) => rubric.id !== id));
-      setRubricSuccess('Rubric deleted successfully');
-      setTimeout(() => setRubricSuccess(null), 3000);
-    } catch (err: any) {
-      setRubricError(err.response?.data?.detail || 'Failed to delete rubric');
-    }
-  }, []);
+      try {
+        await rubricAPI.delete(id);
+        setRubrics((prev) => prev.filter((rubric) => rubric.id !== id));
+        setRubricSuccess('Rubric deleted successfully');
+        setTimeout(() => setRubricSuccess(null), 3000);
+      } catch (err: any) {
+        setRubricError(err.response?.data?.detail || 'Failed to delete rubric');
+      }
+    },
+    [confirm],
+  );
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -457,7 +469,7 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <main className="app-container studio-analytics analytics-fire-page">
+    <main className="app-container studio-analytics analytics-fire-page studio-surface">
       <header className="app-header analytics-fire-header">
         <h1>Analytics Dashboard</h1>
         <p>

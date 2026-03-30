@@ -3,14 +3,17 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useConfirm } from '@/contexts/ConfirmContext';
 import { classesAPI, audioAPI } from '@/services/api';
 import { Classroom, ClassPresentation, Student, ClassStats } from '@/types/classroom';
+import { UPLOAD_ACCEPT_VALUE, isSupportedUploadFile } from '@/utils/media';
 
 export default function ClassDetailPage() {
   const router = useRouter();
   const params = useParams();
   const classId = params.id as string;
   const { user, isAuthenticated, loading } = useAuth();
+  const confirm = useConfirm();
 
   const [classroom, setClassroom] = useState<Classroom | null>(null);
   const [presentations, setPresentations] = useState<ClassPresentation[]>([]);
@@ -88,8 +91,14 @@ export default function ClassDetailPage() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const fileArray = Array.from(files);
-    
+    const fileArray = Array.from(files).filter((file) => isSupportedUploadFile(file));
+    if (fileArray.length === 0) {
+      setError('Unsupported file type. Use audio or video files.');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
     setUploading(true);
     setUploadProgress(0);
     setError(null);
@@ -147,8 +156,15 @@ export default function ClassDetailPage() {
   };
 
   const handleLeaveClass = async () => {
-    if (!confirm('Are you sure you want to leave this class?')) return;
-    
+    const ok = await confirm({
+      title: 'Leave class',
+      message: 'Are you sure you want to leave this class?',
+      confirmLabel: 'Leave',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
     try {
       await classesAPI.leave(classId);
       router.push('/classes');
@@ -158,8 +174,16 @@ export default function ClassDetailPage() {
   };
 
   const handleDeleteClass = async () => {
-    if (!confirm('Are you sure you want to delete this class? This will remove all enrollments but not student submissions.')) return;
-    
+    const ok = await confirm({
+      title: 'Delete class',
+      message:
+        'Are you sure you want to delete this class? This will remove all enrollments but not student submissions.',
+      confirmLabel: 'Delete class',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
     try {
       await classesAPI.deleteClass(classId);
       router.push('/classes');
@@ -224,7 +248,7 @@ export default function ClassDetailPage() {
 
   if (loading || loadingData) {
     return (
-      <main className="app-container studio-class-detail">
+      <main className="app-container studio-class-detail studio-surface">
         <div className="class-detail-container">
           <div className="skeleton-line" style={{ height: '32px', width: '40%', marginBottom: '0.5rem' }}></div>
           <div className="skeleton-line" style={{ height: '20px', width: '60%', marginBottom: '2rem' }}></div>
@@ -247,7 +271,7 @@ export default function ClassDetailPage() {
 
   if (error && !classroom) {
     return (
-      <main className="app-container studio-class-detail">
+      <main className="app-container studio-class-detail studio-surface">
         <div className="class-detail-container">
           <div className="error-card">
             <h2>Error</h2>
@@ -266,7 +290,7 @@ export default function ClassDetailPage() {
   }
 
   return (
-    <main className="app-container studio-class-detail">
+    <main className="app-container studio-class-detail studio-surface">
       <div className="class-detail-container">
         <div className="class-detail-header">
           <button onClick={() => router.push('/classes')} className="back-button">
@@ -320,7 +344,7 @@ export default function ClassDetailPage() {
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileSelect}
-                accept="audio/*"
+                accept={UPLOAD_ACCEPT_VALUE}
                 multiple
                 style={{ display: 'none' }}
                 disabled={uploading}
@@ -333,7 +357,7 @@ export default function ClassDetailPage() {
                 {uploading ? `Uploading... ${uploadProgress}%` : '+ Submit Presentation'}
               </button>
               <p className="upload-hint">
-                Submit your presentation for instructor review. To practice and grade yourself, upload to your Library instead.
+                Submit your presentation as audio or video files.
               </p>
             </div>
             {uploading && (

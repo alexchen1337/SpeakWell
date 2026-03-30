@@ -111,7 +111,7 @@ export default function ClassesPage() {
   // Prompt to set role if not set
   if (!user.role) {
     return (
-      <main className="app-container studio-classes">
+      <main className="app-container studio-classes studio-surface">
         <div className="classes-container">
           <div className="role-prompt-card">
             <h1>Welcome to Classes</h1>
@@ -129,7 +129,7 @@ export default function ClassesPage() {
   const classes = isInstructor ? teachingClasses : enrolledClasses;
 
   return (
-    <main className="app-container studio-classes">
+    <main className="app-container studio-classes studio-surface">
       <div className="classes-container">
         <div className="classes-header">
           <div>
