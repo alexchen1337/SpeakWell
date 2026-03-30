@@ -645,8 +645,8 @@ export default function LibraryPage() {
           </section>
 
           <section className="library-b-pro-tip">
-            <h3>Pro tip</h3>
-            <p>Click a row to select it, then click again to open the transcript viewer and grading pane.</p>
+            <h3>Workflow tip</h3>
+            <p>Rename your presentations to something like "course-week-topic-speaker" for easier organization.</p>
           </section>
         </aside>
       </div>
