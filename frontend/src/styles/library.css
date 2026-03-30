@@ -604,6 +604,15 @@
   text-transform: capitalize;
 }
 
+.library-b-queue-preview {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-height: 140px;
+  border-radius: 6px;
+  border: 1px solid #2a2a28;
+  background: #0b0b09;
+}
+
 .library-b-progress {
   grid-column: 1 / -1;
   height: 4px;

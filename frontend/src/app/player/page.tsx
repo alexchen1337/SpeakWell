@@ -10,11 +10,13 @@ import RubricSelectorModal from '@/components/RubricSelectorModal';
 import GradingResultsModal from '@/components/GradingResultsModal';
 import { TranscriptWord } from '@/types/audio';
 import { Rubric, Grading } from '@/types/grading';
+import { isVideoMedia } from '@/utils/media';
 
 interface StoredAudioFile {
   id: string;
   title: string;
   url: string;
+  filename?: string;
   duration: number | null;
   size: number;
 }
@@ -174,6 +176,7 @@ export default function PlayerPage() {
         id: freshAudio.id,
         title: freshAudio.title,
         url: freshAudio.url,
+        filename: freshAudio.filename,
         duration: freshAudio.duration,
         size: freshAudio.size,
       });
@@ -342,6 +345,7 @@ export default function PlayerPage() {
 
   const completedGradings = gradings.filter(g => g.status === 'completed');
   const processingGradings = gradings.filter(g => g.status === 'processing');
+  const isVideo = isVideoMedia({ filename: audio.filename, url: audio.url, title: audio.title });
 
   return (
     <main className="player-container studio-player">
@@ -383,7 +387,7 @@ export default function PlayerPage() {
       <div className="player-layout">
         <div className="player-panel">
           <div className="player-section-header">
-            <h2>Audio Player</h2>
+            <h2>{isVideo ? 'Video Preview' : 'Audio Player'}</h2>
           </div>
           {loadingAudio ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
