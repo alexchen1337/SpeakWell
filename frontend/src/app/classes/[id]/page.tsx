@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useConfirm } from '@/contexts/ConfirmContext';
 import { classesAPI, audioAPI } from '@/services/api';
 import { Classroom, ClassPresentation, Student, ClassStats } from '@/types/classroom';
+import { UPLOAD_ACCEPT_VALUE, isSupportedUploadFile } from '@/utils/media';
 
 export default function ClassDetailPage() {
   const router = useRouter();
@@ -90,8 +91,14 @@ export default function ClassDetailPage() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const fileArray = Array.from(files);
-    
+    const fileArray = Array.from(files).filter((file) => isSupportedUploadFile(file));
+    if (fileArray.length === 0) {
+      setError('Unsupported file type. Use audio or video files.');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
     setUploading(true);
     setUploadProgress(0);
     setError(null);
@@ -337,7 +344,7 @@ export default function ClassDetailPage() {
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileSelect}
-                accept="audio/*"
+                accept={UPLOAD_ACCEPT_VALUE}
                 multiple
                 style={{ display: 'none' }}
                 disabled={uploading}
@@ -350,7 +357,7 @@ export default function ClassDetailPage() {
                 {uploading ? `Uploading... ${uploadProgress}%` : '+ Submit Presentation'}
               </button>
               <p className="upload-hint">
-                Submit your presentation for instructor review. To practice and grade yourself, upload to your Library instead.
+                Submit your presentation as audio or video files.
               </p>
             </div>
             {uploading && (

@@ -1,5 +1,7 @@
 import io
 import os
+import subprocess
+import tempfile
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -9,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import STORAGE_BUCKET
 from app.core.dependencies import get_storage_client, generate_signed_url
-from app.models import AudioFile, AudioStatus, User, Classroom, Enrollment
+from app.models import AudioFile, AudioStatus, User
 from app.dao.audio_dao import audio_dao
 from app.dao.classroom_dao import classroom_dao
 from app.dao.enrollment_dao import enrollment_dao
@@ -20,6 +22,46 @@ try:
     MUTAGEN_AVAILABLE = True
 except ImportError:
     MUTAGEN_AVAILABLE = False
+
+MAX_UPLOAD_BYTES = 100 * 1024 * 1024
+SUPPORTED_VIDEO_MIME_TYPES = {
+    "video/mp4",
+    "video/quicktime",
+    "video/x-m4v",
+    "video/webm",
+}
+SUPPORTED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm"}
+SUPPORTED_AUDIO_EXTENSIONS = {
+    ".aac",
+    ".aif",
+    ".aiff",
+    ".flac",
+    ".m4a",
+    ".mp3",
+    ".oga",
+    ".ogg",
+    ".opus",
+    ".wav",
+    ".wma",
+}
+EXTENSION_CONTENT_TYPES = {
+    ".aac": "audio/aac",
+    ".aif": "audio/aiff",
+    ".aiff": "audio/aiff",
+    ".flac": "audio/flac",
+    ".m4a": "audio/mp4",
+    ".mp3": "audio/mpeg",
+    ".oga": "audio/ogg",
+    ".ogg": "audio/ogg",
+    ".opus": "audio/opus",
+    ".wav": "audio/wav",
+    ".wma": "audio/x-ms-wma",
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".m4v": "video/x-m4v",
+    ".webm": "video/webm",
+}
+GENERIC_CONTENT_TYPES = {"", "application/octet-stream", "binary/octet-stream"}
 
 
 def can_access_audio(audio: AudioFile, user: User, db: Session) -> bool:
@@ -52,6 +94,109 @@ def extract_audio_duration(file_contents: bytes, filename: str) -> Optional[int]
     except Exception:
         pass
     return None
+
+
+def _normalize_content_type(content_type: Optional[str]) -> str:
+    if not content_type:
+        return ""
+    return content_type.split(";")[0].strip().lower()
+
+
+def _get_extension(filename: Optional[str]) -> str:
+    return os.path.splitext(filename or "")[1].lower()
+
+
+def is_video_filename(filename: Optional[str]) -> bool:
+    return _get_extension(filename) in SUPPORTED_VIDEO_EXTENSIONS
+
+
+def _resolve_media_type(file: UploadFile) -> Optional[str]:
+    normalized_type = _normalize_content_type(file.content_type)
+    extension = _get_extension(file.filename)
+
+    if normalized_type.startswith("audio/"):
+        return "audio"
+    if normalized_type in SUPPORTED_VIDEO_MIME_TYPES:
+        return "video"
+
+    if extension in SUPPORTED_AUDIO_EXTENSIONS:
+        return "audio"
+    if extension in SUPPORTED_VIDEO_EXTENSIONS:
+        return "video"
+
+    return None
+
+
+def _resolve_upload_content_type(file: UploadFile, media_type: str) -> str:
+    extension = _get_extension(file.filename)
+    if extension in EXTENSION_CONTENT_TYPES:
+        return EXTENSION_CONTENT_TYPES[extension]
+
+    normalized_type = _normalize_content_type(file.content_type)
+    if normalized_type not in GENERIC_CONTENT_TYPES:
+        return normalized_type
+
+    return "video/mp4" if media_type == "video" else "audio/mpeg"
+
+
+def _ensure_filename(filename: Optional[str], media_type: str, fallback_stem: str = "upload") -> str:
+    if filename and filename.strip():
+        return filename
+    default_extension = ".mp4" if media_type == "video" else ".mp3"
+    return f"{fallback_stem}{default_extension}"
+
+
+def _convert_video_to_mp3(file_contents: bytes, filename: str) -> tuple[bytes, str]:
+    extension = os.path.splitext(filename)[1].lower() or ".mp4"
+    stem = os.path.splitext(os.path.basename(filename))[0] or "video"
+    input_path = None
+    output_path = None
+
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=extension) as input_file:
+            input_file.write(file_contents)
+            input_path = input_file.name
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as output_file:
+            output_path = output_file.name
+
+        try:
+            result = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-loglevel",
+                    "error",
+                    "-i",
+                    input_path,
+                    "-vn",
+                    "-acodec",
+                    "libmp3lame",
+                    "-q:a",
+                    "2",
+                    output_path,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except FileNotFoundError as exc:
+            raise ValueError("Video conversion failed: ffmpeg is not installed") from exc
+        if result.returncode != 0:
+            error_message = (result.stderr or "Unknown ffmpeg error").strip()
+            raise ValueError(f"Video conversion failed: {error_message}")
+
+        with open(output_path, "rb") as output_file:
+            audio_bytes = output_file.read()
+        if not audio_bytes:
+            raise ValueError("Video conversion failed: extracted audio is empty")
+
+        return audio_bytes, f"{stem}.mp3"
+    finally:
+        if input_path and os.path.exists(input_path):
+            os.unlink(input_path)
+        if output_path and os.path.exists(output_path):
+            os.unlink(output_path)
 
 
 def get_unique_filename(db: Session, user_id: str, filename: str) -> str:
@@ -117,34 +262,48 @@ async def upload_files(
     for file in files:
         object_key = None
         try:
-            if not file.content_type or not file.content_type.startswith("audio/"):
-                failed_files.append({"filename": file.filename, "error": "Not an audio file"})
+            media_type = _resolve_media_type(file)
+            if not media_type:
+                failed_files.append(
+                    {
+                        "filename": file.filename,
+                        "error": "Unsupported file type. Use audio files or video files.",
+                    }
+                )
                 continue
-            if file.size and file.size > 100 * 1024 * 1024:
+            if file.size and file.size > MAX_UPLOAD_BYTES:
                 failed_files.append({"filename": file.filename, "error": "File too large (max 100MB)"})
                 continue
 
-            file_id = str(uuid.uuid4())
-            file_extension = os.path.splitext(file.filename)[1]
-            object_key = f"{current_user.id}/{file_id}{file_extension}"
-
-            contents = await file.read()
-            if not contents:
+            source_filename = _ensure_filename(file.filename, media_type)
+            source_contents = await file.read()
+            if not source_contents:
                 failed_files.append({"filename": file.filename, "error": "Empty file"})
                 continue
+            if len(source_contents) > MAX_UPLOAD_BYTES:
+                failed_files.append({"filename": file.filename, "error": "File too large (max 100MB)"})
+                continue
+
+            upload_contents = source_contents
+            upload_filename = source_filename
+            upload_content_type = _resolve_upload_content_type(file, media_type)
+
+            file_id = str(uuid.uuid4())
+            file_extension = os.path.splitext(upload_filename)[1] or ".mp3"
+            object_key = f"{current_user.id}/{file_id}{file_extension}"
 
             storage_client.storage.from_(STORAGE_BUCKET).upload(
                 path=object_key,
-                file=contents,
+                file=upload_contents,
                 file_options={
-                    "content-type": file.content_type,
+                    "content-type": upload_content_type,
                     "cache-control": "public, max-age=31536000",
                 },
             )
 
-            file_size = len(contents)
-            duration = extract_audio_duration(contents, file.filename)
-            unique_filename = get_unique_filename(db, current_user.id, file.filename)
+            file_size = len(upload_contents)
+            duration = extract_audio_duration(upload_contents, upload_filename)
+            unique_filename = get_unique_filename(db, current_user.id, upload_filename)
 
             audio_file = AudioFile(
                 id=file_id,

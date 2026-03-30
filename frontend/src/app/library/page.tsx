@@ -8,6 +8,7 @@ import { useConfirm } from '@/contexts/ConfirmContext';
 import { AudioFile, UploadingFile } from '@/types/audio';
 import { audioAPI } from '@/services/api';
 import Button from '@/components/ui/Button';
+import { UPLOAD_ACCEPT_VALUE, isSupportedUploadFile } from '@/utils/media';
 
 type SortOption = 'newest' | 'oldest' | 'alphabetical' | 'largest' | 'smallest';
 
@@ -386,7 +387,7 @@ export default function LibraryPage() {
 
   const onDropUpload = (e: React.DragEvent) => {
     e.preventDefault();
-    const files = Array.from(e.dataTransfer.files || []).filter((file) => file.type.startsWith('audio/'));
+    const files = Array.from(e.dataTransfer.files || []).filter((file) => isSupportedUploadFile(file));
     if (files.length > 0) handleFilesSelected(files);
   };
 
@@ -400,10 +401,10 @@ export default function LibraryPage() {
         ref={fileInputRef}
         type="file"
         className="library-b-file-input"
-        accept="audio/*"
+        accept={UPLOAD_ACCEPT_VALUE}
         multiple
         onChange={(e) => {
-          const files = Array.from(e.target.files || []).filter((file) => file.type.startsWith('audio/'));
+          const files = Array.from(e.target.files || []).filter((file) => isSupportedUploadFile(file));
           if (files.length > 0) handleFilesSelected(files);
           e.target.value = '';
         }}
@@ -460,7 +461,7 @@ export default function LibraryPage() {
           ) : filteredAndSortedAudio.length === 0 ? (
             <div className="library-b-empty">
               <p>No matching files</p>
-              <span>Try another search or upload audio.</span>
+              <span>Try another search or upload audio/video.</span>
             </div>
           ) : (
             <>
@@ -587,10 +588,10 @@ export default function LibraryPage() {
             >
               <input
                 type="file"
-                accept="audio/*"
+                accept={UPLOAD_ACCEPT_VALUE}
                 multiple
                 onChange={(e) => {
-                  const files = Array.from(e.target.files || []).filter((file) => file.type.startsWith('audio/'));
+                  const files = Array.from(e.target.files || []).filter((file) => isSupportedUploadFile(file));
                   if (files.length > 0) handleFilesSelected(files);
                   e.target.value = '';
                 }}
@@ -600,7 +601,7 @@ export default function LibraryPage() {
                 ↑
               </span>
               <span className="library-b-drop-strong">Drop to upload</span>
-              <span className="library-b-drop-sub">MP3, WAV, OGG, M4A</span>
+              <span className="library-b-drop-sub">Audio + MP4/MOV/M4V/WEBM video</span>
             </label>
 
             <ul className="library-b-queue">
@@ -644,8 +645,8 @@ export default function LibraryPage() {
           </section>
 
           <section className="library-b-pro-tip">
-            <h3>Pro tip</h3>
-            <p>Click a row to select it, then click again to open the transcript viewer and grading pane.</p>
+            <h3>Workflow tip</h3>
+            <p>Rename your presentations to something like "course-week-topic-speaker" for easier organization.</p>
           </section>
         </aside>
       </div>

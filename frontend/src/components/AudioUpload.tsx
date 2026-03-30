@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { UploadingFile } from '@/types/audio';
+import { UPLOAD_ACCEPT_VALUE, isSupportedUploadFile } from '@/utils/media';
 
 interface AudioUploadProps {
   onFilesSelected: (files: File[]) => void;
@@ -15,10 +16,10 @@ export default function AudioUpload({ onFilesSelected, uploadingFiles, isUploadi
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const audioFiles = files.filter(file => file.type.startsWith('audio/'));
+    const mediaFiles = files.filter((file) => isSupportedUploadFile(file));
     
-    if (audioFiles.length > 0) {
-      onFilesSelected(audioFiles);
+    if (mediaFiles.length > 0) {
+      onFilesSelected(mediaFiles);
     }
     
     if (fileInputRef.current) {
@@ -32,10 +33,10 @@ export default function AudioUpload({ onFilesSelected, uploadingFiles, isUploadi
     setIsDragging(false);
     
     const files = Array.from(e.dataTransfer.files);
-    const audioFiles = files.filter(file => file.type.startsWith('audio/'));
+    const mediaFiles = files.filter((file) => isSupportedUploadFile(file));
     
-    if (audioFiles.length > 0) {
-      onFilesSelected(audioFiles);
+    if (mediaFiles.length > 0) {
+      onFilesSelected(mediaFiles);
     }
   };
 
@@ -78,12 +79,12 @@ export default function AudioUpload({ onFilesSelected, uploadingFiles, isUploadi
         </svg>
         <h3>{isUploading ? 'Uploading' : 'Drop files here'}</h3>
         <p>{isUploading ? 'Please wait while your files are being processed' : 'or click to browse from your device'}</p>
-        {!isUploading && <p className="upload-hint">MP3, WAV, OGG, M4A supported</p>}
+        {!isUploading && <p className="upload-hint">Audio or video files supported</p>}
       </div>
       <input
         ref={fileInputRef}
         type="file"
-        accept="audio/*"
+        accept={UPLOAD_ACCEPT_VALUE}
         multiple
         onChange={handleFileChange}
         style={{ display: 'none' }}
@@ -114,7 +115,6 @@ export default function AudioUpload({ onFilesSelected, uploadingFiles, isUploadi
                   </svg>
                 )}
               </div>
-              
               {file.status === 'uploading' && (
                 <div className="progress-bar-container">
                   <div className="progress-bar" style={{ width: `${file.progress}%` }}></div>
