@@ -5,11 +5,6 @@
   outline-offset: 4px;
   border-radius: 6px;
 }
-.split-auth__input.focus-highlight:focus {
-  outline: 3px solid var(--color-text-primary);
-  outline-offset: 4px;
-  border-radius: 6px;
-}
 /* =========================================
    Compact Hint Bar
 ========================================= */
