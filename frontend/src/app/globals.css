@@ -5758,6 +5758,12 @@ input, select, textarea {
   height: 100%;
   object-fit: cover;
   z-index: 0;
+  opacity: 0;
+  transition: opacity 0.8s ease-out;
+}
+
+.landing-video-bg.is-ready {
+  opacity: 1;
 }
 
 .landing-video-tint {

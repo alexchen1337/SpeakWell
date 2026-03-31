@@ -8,6 +8,7 @@ export default function Landing() {
   const router = useRouter();
   const { isAuthenticated, loading } = useAuth();
   const [videoReady, setVideoReady] = useState(false);
+  const [contentReady, setContentReady] = useState(false);
 
   useEffect(() => {
     if (!loading && isAuthenticated) {
@@ -18,13 +19,16 @@ export default function Landing() {
   return (
     <div className="landing-root">
       <video
-        className="landing-video-bg"
+        className={`landing-video-bg${videoReady ? ' is-ready' : ''}`}
         autoPlay
         loop
         muted
         playsInline
         preload="auto"
-        onCanPlay={() => setVideoReady(true)}
+        onCanPlay={() => {
+          setVideoReady(true);
+          setTimeout(() => setContentReady(true), 800);
+        }}
       >
         <source
           src="https://ookotoxfaxedzscrgthj.supabase.co/storage/v1/object/public/landing-page/Timeline%201.mp4"
@@ -33,7 +37,7 @@ export default function Landing() {
       </video>
       <div className="landing-video-tint" aria-hidden="true" />
 
-      {videoReady && (
+      {contentReady && (
         <>
           <nav className="landing-nav">
             <span className="landing-brand">SpeakWell</span>
