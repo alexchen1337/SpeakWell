@@ -39,9 +39,14 @@ export default function Landing() {
         </h1>
 
         <div className="landing-cta-row animate-fade-rise-delay">
-          <button className="landing-pill landing-pill--orange" onClick={() => router.push('/login')}>
+          <a
+            className="landing-pill landing-pill--orange"
+            href="https://github.com/alexchen1337/SpeakWell"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             View Demo
-          </button>
+          </a>
           <button className="landing-pill" onClick={() => router.push('/login')}>
             Get Started
           </button>
