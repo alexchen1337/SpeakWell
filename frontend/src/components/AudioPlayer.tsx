@@ -3,12 +3,14 @@
 import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import type WaveSurfer from 'wavesurfer.js';
 import { useRouter } from 'next/navigation';
+import { isVideoMedia } from '@/utils/media';
 
 interface AudioPlayerProps {
   audio: {
     id: string;
     title: string;
     url: string;
+    filename?: string;
     duration: number | null;
     size?: number;
   } | null;
@@ -24,6 +26,7 @@ export interface AudioPlayerHandle {
 const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({ audio, onTimeUpdate, onDurationReady }, ref) => {
   const router = useRouter();
   const waveformRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const onTimeUpdateRef = useRef(onTimeUpdate);
   const onDurationReadyRef = useRef(onDurationReady);
@@ -33,6 +36,7 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({ audio, on
   const [volume, setVolume] = useState(0.7);
   const [error, setError] = useState<string | null>(null);
   const [waveformReady, setWaveformReady] = useState(false);
+  const isVideo = isVideoMedia({ filename: audio?.filename, url: audio?.url, title: audio?.title });
 
   useEffect(() => {
     onTimeUpdateRef.current = onTimeUpdate;
@@ -43,6 +47,23 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({ audio, on
   }, [onDurationReady]);
 
   useEffect(() => {
+    if (isVideo) {
+      if (wavesurferRef.current) {
+        try {
+          if (wavesurferRef.current.isPlaying()) {
+            wavesurferRef.current.pause();
+          }
+          wavesurferRef.current.destroy();
+        } catch {
+          // ignore cleanup errors
+        } finally {
+          wavesurferRef.current = null;
+        }
+      }
+      setWaveformReady(false);
+      return;
+    }
+
     if (!waveformRef.current) return;
 
     let ws: WaveSurfer | null = null;
@@ -129,50 +150,119 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({ audio, on
         }
       }
     };
-  }, []);
+  }, [isVideo]);
 
   useEffect(() => {
-    if (!waveformReady) return;
+    if (isVideo || !waveformReady) return;
 
     if (wavesurferRef.current && audio && audio.url) {
       setError(null);
 
       wavesurferRef.current.load(audio.url).catch((err) => {
         if (err.name !== 'AbortError') {
-          setError('Failed to load audio file. The file may be missing or corrupted.');
+          setError('Failed to load media file. The file may be missing or corrupted.');
         }
       });
       setIsPlaying(false);
       setCurrentTime(0);
     } else if (audio && !audio.url) {
-      setError('Audio URL is not available. Please try refreshing the page.');
+      setError('Media URL is not available. Please try refreshing the page.');
     }
-  }, [audio, waveformReady]);
+  }, [audio, waveformReady, isVideo]);
 
   useEffect(() => {
-    if (wavesurferRef.current) {
+    if (!isVideo) return;
+    if (!videoRef.current || !audio?.url) return;
+
+    const video = videoRef.current;
+    setError(null);
+    setIsPlaying(false);
+    setCurrentTime(0);
+
+    const onLoadedMetadata = () => {
+      if (Number.isFinite(video.duration) && video.duration > 0) {
+        setDuration(video.duration);
+        onDurationReadyRef.current?.(video.duration);
+      }
+    };
+
+    const onTime = () => {
+      const time = video.currentTime;
+      setCurrentTime(time);
+      onTimeUpdateRef.current?.(time);
+    };
+
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    const onEnded = () => setIsPlaying(false);
+    const onError = () => setError('Failed to load media file. The file may be missing or corrupted.');
+
+    video.src = audio.url;
+    video.load();
+
+    video.addEventListener('loadedmetadata', onLoadedMetadata);
+    video.addEventListener('timeupdate', onTime);
+    video.addEventListener('play', onPlay);
+    video.addEventListener('pause', onPause);
+    video.addEventListener('ended', onEnded);
+    video.addEventListener('error', onError);
+
+    return () => {
+      video.removeEventListener('loadedmetadata', onLoadedMetadata);
+      video.removeEventListener('timeupdate', onTime);
+      video.removeEventListener('play', onPlay);
+      video.removeEventListener('pause', onPause);
+      video.removeEventListener('ended', onEnded);
+      video.removeEventListener('error', onError);
+    };
+  }, [audio, isVideo]);
+
+  useEffect(() => {
+    if (isVideo && videoRef.current) {
+      videoRef.current.volume = volume;
+      return;
+    }
+    if (!isVideo && wavesurferRef.current) {
       wavesurferRef.current.setVolume(volume);
     }
-  }, [volume]);
+  }, [volume, isVideo]);
 
   useImperativeHandle(ref, () => ({
     seekTo: (time: number) => {
       if (wavesurferRef.current) {
-        const duration = wavesurferRef.current.getDuration();
-        if (duration > 0) {
-          wavesurferRef.current.seekTo(time / duration);
+        const currentDuration = wavesurferRef.current.getDuration();
+        if (currentDuration > 0) {
+          wavesurferRef.current.seekTo(time / currentDuration);
           setCurrentTime(time);
           onTimeUpdateRef.current?.(time);
         }
+      } else if (videoRef.current) {
+        videoRef.current.currentTime = Math.max(0, time);
+        setCurrentTime(videoRef.current.currentTime);
+        onTimeUpdateRef.current?.(videoRef.current.currentTime);
       }
     },
     getCurrentTime: () => {
-      return wavesurferRef.current?.getCurrentTime() ?? 0;
+      if (wavesurferRef.current) {
+        return wavesurferRef.current.getCurrentTime();
+      }
+      if (videoRef.current) {
+        return videoRef.current.currentTime;
+      }
+      return 0;
     }
   }), []);
 
   const togglePlayPause = () => {
-    if (wavesurferRef.current) {
+    if (isVideo && videoRef.current) {
+      if (videoRef.current.paused) {
+        void videoRef.current.play();
+      } else {
+        videoRef.current.pause();
+      }
+      return;
+    }
+    if (!isVideo && wavesurferRef.current) {
       wavesurferRef.current.playPause();
     }
   };
@@ -198,7 +288,7 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({ audio, on
           <svg className="error-icon-large" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
           </svg>
-          <h3 className="error-title">Unable to load audio</h3>
+          <h3 className="error-title">Unable to load media</h3>
           <p className="error-message">{error}</p>
           <button onClick={handleGoHome} className="error-button">
             <svg className="button-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -230,43 +320,57 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({ audio, on
         <h3>{audio.title}</h3>
       </div>
 
-      <div className="waveform-container" ref={waveformRef} />
-
-      <div className="player-controls">
-        <button className="play-btn" onClick={togglePlayPause}>
-          {isPlaying ? (
-            <svg fill="currentColor" viewBox="0 0 24 24">
-              <rect x="6" y="4" width="4" height="16" rx="1" />
-              <rect x="14" y="4" width="4" height="16" rx="1" />
-            </svg>
-          ) : (
-            <svg fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5.14v14.72a1 1 0 001.5.86l11.5-7.36a1 1 0 000-1.72L9.5 4.28A1 1 0 008 5.14z" />
-            </svg>
-          )}
-        </button>
-
-        <div className="time-display">
-          <span>{formatTime(currentTime)}</span>
-          <span>/</span>
-          <span>{formatTime(duration)}</span>
-        </div>
-
-        <div className="volume-control">
-          <svg className="volume-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
-          </svg>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={volume}
-            onChange={handleVolumeChange}
-            className="volume-slider"
+      {isVideo ? (
+        <div className="video-preview-container">
+          <video
+            ref={videoRef}
+            className="video-preview"
+            controls
+            playsInline
+            preload="metadata"
           />
         </div>
-      </div>
+      ) : (
+        <div className="waveform-container" ref={waveformRef} />
+      )}
+
+      {!isVideo && (
+        <div className="player-controls">
+          <button className="play-btn" onClick={togglePlayPause}>
+            {isPlaying ? (
+              <svg fill="currentColor" viewBox="0 0 24 24">
+                <rect x="6" y="4" width="4" height="16" rx="1" />
+                <rect x="14" y="4" width="4" height="16" rx="1" />
+              </svg>
+            ) : (
+              <svg fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5.14v14.72a1 1 0 001.5.86l11.5-7.36a1 1 0 000-1.72L9.5 4.28A1 1 0 008 5.14z" />
+              </svg>
+            )}
+          </button>
+
+          <div className="time-display">
+            <span>{formatTime(currentTime)}</span>
+            <span>/</span>
+            <span>{formatTime(duration)}</span>
+          </div>
+
+          <div className="volume-control">
+            <svg className="volume-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+            </svg>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={volume}
+              onChange={handleVolumeChange}
+              className="volume-slider"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 });

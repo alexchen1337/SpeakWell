@@ -14,7 +14,7 @@ from app.core.dependencies import download_file
 from app.models import SessionLocal, AudioFile, Transcript, AudioStatus
 from app.dao.audio_dao import audio_dao
 from app.dao.transcript_dao import transcript_dao
-from app.services.audio_service import can_access_audio
+from app.services.audio_service import can_access_audio, is_video_filename, _convert_video_to_mp3
 
 
 def get_openai_client():
@@ -41,13 +41,19 @@ def transcribe_audio_file(audio_file_id: str, object_key: str, filename: str):
         if not OPENAI_API_KEY:
             raise ValueError("OPENAI_API_KEY environment variable not set")
 
-        audio_bytes = download_file(object_key)
-        print(f"[Transcription] Downloaded {len(audio_bytes)} bytes from storage")
+        source_bytes = download_file(object_key)
+        print(f"[Transcription] Downloaded {len(source_bytes)} bytes from storage")
+
+        transcription_bytes = source_bytes
+        transcription_filename = filename
+        if is_video_filename(filename):
+            transcription_bytes, transcription_filename = _convert_video_to_mp3(source_bytes, filename)
+            print(f"[Transcription] Extracted audio from video: {filename} -> {transcription_filename}")
 
         client = OpenAI(api_key=OPENAI_API_KEY)
         transcription = client.audio.transcriptions.create(
             model="whisper-1",
-            file=(filename, io.BytesIO(audio_bytes)),
+            file=(transcription_filename, io.BytesIO(transcription_bytes)),
             response_format="verbose_json",
             timestamp_granularities=["word"],
         )

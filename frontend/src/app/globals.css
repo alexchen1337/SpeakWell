@@ -1316,6 +1316,14 @@ input, select, textarea {
   gap: 0.375rem;
 }
 
+.upload-video-preview {
+  width: 100%;
+  max-height: 180px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-secondary);
+}
+
 .error-message {
   font-size: 0.6875rem;
   color: var(--color-error);
@@ -1794,6 +1802,20 @@ input, select, textarea {
 .waveform-container:hover {
   border-color: var(--color-accent);
   background: var(--color-bg-tertiary);
+}
+
+.video-preview-container {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.video-preview {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  background: #000;
 }
 
 .player-controls {
@@ -4506,6 +4528,39 @@ input, select, textarea {
   margin: 0;
 }
 
+.class-upload-preview-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.class-upload-preview-card {
+  width: min(320px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.625rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-secondary);
+}
+
+.class-upload-preview-name {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.class-upload-preview-video {
+  width: 100%;
+  max-height: 180px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-primary);
+}
+
 /* Students list */
 .students-list {
   display: flex;
@@ -7062,4 +7117,3 @@ input, select, textarea {
 .terms-page__actions a:hover {
   text-decoration: underline;
 }
-
