@@ -2,7 +2,7 @@
 
 /*
  * Issues:
- *  1. Odd behavior when focusing 'Close' and 'Delete' buttons in grading modal
+ *  1. Pressing escape in focus mode with modal open closes modal
  *  2. isElementVisible does not account for modal header
  *  3. No way to change volume on player screen
  *  4. No way to filter results on library screen
@@ -41,7 +41,7 @@ export const KEYMAP = {
     SCROLL_BOT  : { key: "b",             desc: "Scroll to Bottom of Screen" },
   },
   FOCUS_MODE: {
-    EXIT_FOCUS  : { key: ["Escape", "f"], desc: "Exit Focus Mode" },
+    EXIT_FOCUS  : { key: ["f", "Escape"], desc: "Exit Focus Mode" },
     NEXT        : { key: "j",             desc: "Next Element" },
     PREV        : { key: "k",             desc: "Previous Element" },
     TOP         : { key: "t",             desc: "Go to Top Visible Element" },
@@ -98,7 +98,9 @@ export default function KeyboardProvider({
         .rubric-card,
         .result-header,
         .grading-dash-card,
-        .class-card
+        .class-card,
+        .class-dash-card,
+        .presentation-row
       `)
     ).filter(el => !el.hasAttribute("disabled"));
 
@@ -131,13 +133,17 @@ export default function KeyboardProvider({
 
     focusables.forEach(el => el.classList.remove("focus-highlight"));
     const active = focusables[focusedIndex];
-
     active?.classList.add("focus-highlight");
 
-    const scrollContainer = getActiveModalScrollContainer() 
-      ?? getTranscriptScrollContainer() ?? window;
+    const scrollContainer = 
+      getActiveModalScrollContainer() 
+      ?? getTranscriptScrollContainer() 
+      ?? window;
 
-    scrollIntoViewIfNeeded(active!, scrollContainer);
+    const visible = getVisibleIndicies(focusables);
+
+    // Scroll element into view only when no elements are visible
+    if (visible.length === 0 && active) scrollIntoViewIfNeeded(active, scrollContainer);
   }, [isFocusMode, focusedIndex, focusables]);
 
   /*
@@ -171,42 +177,42 @@ export default function KeyboardProvider({
    * Scroll page if focused element is offscreen
    */
   const scrollIntoViewIfNeeded = (el: HTMLElement, container: HTMLElement | Window = window) => {
-    if (container instanceof Window) {
-      // Window scroll
-      const { topOffset, bottomOffset } = getViewportOffsets();
-      const rect = el.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
+    const rect = el.getBoundingClientRect();
 
-      if (rect.top < topOffset) {
-        window.scrollBy({ top: rect.top - topOffset, behavior: "smooth" });
-      } else if (rect.bottom > viewportHeight - bottomOffset) {
-        window.scrollBy({ top: rect.bottom - (viewportHeight - bottomOffset), behavior: "smooth" });
-      }
-    } else {
-      // Container scroll
-      const rect = el.getBoundingClientRect();
-      const containerRect = container.getBoundingClientRect();
+    const isWindow = container instanceof Window;
 
-      // Current scrollTop of container
-      const currentScroll = container.scrollTop;
+    const containerRect = isWindow
+      ? { top: 0, bottom: window.innerHeight }
+      : container.getBoundingClientRect();
 
-      // Element's offset from top of container
-      const offsetTop = rect.top - containerRect.top + currentScroll;
+    const scrollTop = isWindow ? window.scrollY : container.scrollTop;
 
-      // Modal header height
-      const modalHeader = container.querySelector<HTMLElement>(".modal-header");
-      const headerHeight = modalHeader?.offsetHeight ?? 0;
+    const viewportTop = isWindow
+      ? getViewportOffsets().topOffset
+      : containerRect.top + (
+          container.querySelector<HTMLElement>(".modal-header")?.offsetHeight ?? 0
+        );
 
-      // Scroll if element is behind modal header
-      if (rect.top < containerRect.top + headerHeight) {
-        const scrollTo = offsetTop - headerHeight;
-        container.scrollTo({ top: scrollTo, behavior: "smooth" });
-      } else if (rect.bottom > containerRect.bottom) {
-        // Optional: scroll if element goes below bottom of modal container
-        const scrollTo = offsetTop - container.clientHeight + rect.height;
-        container.scrollTo({ top: scrollTo, behavior: "smooth" });
-      }
-      // else element is visible → do nothing
+    const viewportBottom = isWindow
+      ? window.innerHeight - getViewportOffsets().bottomOffset
+      : containerRect.bottom;
+
+    const offsetTop = rect.top - containerRect.top + scrollTop;
+
+    // Above viewport
+    if (rect.top < viewportTop) {
+      const scrollTo = offsetTop - (viewportTop - containerRect.top);
+      isWindow
+        ? window.scrollBy({ top: scrollTo - scrollTop, behavior: "smooth" })
+        : container.scrollTo({ top: scrollTo, behavior: "smooth" });
+    }
+
+    // Below viewport
+    else if (rect.bottom > viewportBottom) {
+      const scrollTo = offsetTop - (viewportBottom - containerRect.top) + rect.height;
+      isWindow
+        ? window.scrollBy({ top: scrollTo - scrollTop, behavior: "smooth" })
+        : container.scrollTo({ top: scrollTo, behavior: "smooth" });
     }
   };
 
