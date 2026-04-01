@@ -11,6 +11,7 @@
  *    a. "/" for search
  *    b. "n" and "N" for navigating to next and prev search terms, respectively
  *  4. Implement go back shortcut
+ *  5. Exit foucs mode on mouse click
  */
 
 "use client";
@@ -348,6 +349,25 @@ export default function KeyboardProvider({ children }: { children: React.ReactNo
 
     prevPathRef.current = pathname;
   }, [pathname]);
+
+  /*
+   * Exit Focus Mode on mouse click or wheel
+   */
+  useEffect(() => {
+    if (!isFocusMode) return;
+
+    const exitOnMouseAction = (e: Event) => {
+      exitFocusMode();
+    };
+
+    window.addEventListener("mousedown", exitOnMouseAction);
+    window.addEventListener("wheel", exitOnMouseAction, { passive: true });
+
+    return () => {
+      window.removeEventListener("mousedown", exitOnMouseAction);
+      window.removeEventListener("wheel", exitOnMouseAction);
+    };
+  }, [isFocusMode, focusables]);
 
   /*
    * Modal open/close detection
