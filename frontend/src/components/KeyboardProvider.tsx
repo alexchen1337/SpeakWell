@@ -2,11 +2,12 @@
 
 /*
  * Issues:
- *  1. Pressing escape in focus mode with modal open closes modal
- *  2. isElementVisible does not account for modal header
- *  3. No way to change volume on player screen
- *  4. No way to filter results on library screen
- *  5. z-index of focus-highlight must be below header and compact hint bar
+ *  1. isElementVisible does not account for modal header
+ *  2. No way to change volume on player screen
+ *  3. No way to filter results on library screen
+ *  4. Focus Mode Highlighting
+ *    a. Does not highlight some elements (some text boxes, upload pre button)
+ *    b. Highlight is cut off for some elements (analytics-fire-recent-pill, result-header)
  */
 
 import { useEffect, useState, useRef } from "react";
@@ -75,8 +76,14 @@ export default function KeyboardProvider({
   const [showKeybindings, setShowKeybindings] = useState(false);
 
   /* =========================================================
-     HELPERS
+    HELPERS
   ========================================================= */
+ /*
+  * Expose Focus Mode Globally
+  */
+  useEffect(() => {
+    (window as any).__FOCUS_MODE__ = isFocusMode;
+  }, [isFocusMode])
 
   /*
    * Get every HTML element that should be focusable in Focus Mode
@@ -269,7 +276,7 @@ export default function KeyboardProvider({
 
   const getActiveModal = (): HTMLElement | null => {
     return document.querySelector<HTMLElement>(
-      ".modal-overlay, .grading-modal-overlay, .rubric-selector-modal"
+      ".modal-overlay, .grading-modal-overlay, .rubric-selector-modal, .rubric-selector-overlay"
     );
   };
 
@@ -389,16 +396,16 @@ export default function KeyboardProvider({
          Focus mode shortcuts
       ========================================================= */
       if (isFocusMode) {
-        e.preventDefault();
         const active = focusables[focusedIndex];
         if (!active) return;
+
         const modal = getActiveModal();
         const scopeKey = modal ? 'modal' : pathname;
 
         switch (e.key) {
-
           case KEYMAP.FOCUS_MODE.EXIT_FOCUS.key[0]:
           case KEYMAP.FOCUS_MODE.EXIT_FOCUS.key[1]:
+            e.preventDefault();
             // Save the last focused element
             setLastFocusedByScope(prev => ({
                 ...prev,
@@ -411,6 +418,7 @@ export default function KeyboardProvider({
             break;
 
           case KEYMAP.FOCUS_MODE.NEXT.key: {
+            e.preventDefault();
             // Jump to next visible focusable element
             const visible = getVisibleIndicies(focusables);
 
@@ -428,6 +436,7 @@ export default function KeyboardProvider({
           }
 
           case KEYMAP.FOCUS_MODE.PREV.key: {
+            e.preventDefault();
             // Jump to previous visible focusable element
             const visible = getVisibleIndicies(focusables);
 
@@ -445,6 +454,7 @@ export default function KeyboardProvider({
           }
 
           case KEYMAP.FOCUS_MODE.TOP.key: {
+            e.preventDefault();
             // Jump to first visible focusable element
             const visible = getVisibleIndicies(focusables);
             if (visible.length > 0) {
@@ -454,6 +464,7 @@ export default function KeyboardProvider({
           }
 
           case KEYMAP.FOCUS_MODE.MIDDLE.key: {
+            e.preventDefault();
             // Jump to middle visible focusable element
             const visible = getVisibleIndicies(focusables);
             if (visible.length > 0) {
@@ -464,6 +475,7 @@ export default function KeyboardProvider({
           }
 
           case KEYMAP.FOCUS_MODE.BOTTOM.key: {
+            e.preventDefault();
             // Jump to bottom visible focusable element
             const visible = getVisibleIndicies(focusables);
             if (visible.length > 0) {
@@ -473,6 +485,7 @@ export default function KeyboardProvider({
           }
 
           case KEYMAP.FOCUS_MODE.SELECT.key:
+            e.preventDefault();
             // Save the last focused element
             setLastFocusedByScope(prev => ({
                 ...prev,
@@ -571,12 +584,14 @@ export default function KeyboardProvider({
             break;
 
           case KEYMAP.AUDIO_PLAYER.VIEW_GRADE.key: {
+            e.preventDefault();
             const btn = getPlayerActionButton("View Grading");
             btn?.click();
             break;
           }
 
           case KEYMAP.AUDIO_PLAYER.GRADE_PRES.key: {
+            e.preventDefault();
             const btn = getPlayerActionButton("Grade Presentation");
             btn?.click();
             break;

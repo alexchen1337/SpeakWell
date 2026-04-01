@@ -68,7 +68,9 @@ export default function GradingResultsModal({
   }, [confirm, currentGrading, isDeleting, onDelete]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') onClose();
+    const isFocusMode = (window as any).__FOCUS_MODE__;
+
+    if (e.key === 'Escape' && !isFocusMode) onClose();
   }, [onClose]);
 
   useEffect(() => {
