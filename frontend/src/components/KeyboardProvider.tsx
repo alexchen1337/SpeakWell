@@ -3,11 +3,17 @@
 /*
  * Issues:
  *  1. isElementVisible does not account for modal header
- *  2. No way to change volume on player screen
- *  3. No way to filter results on library screen
- *  4. Focus Mode Highlighting
+ *  2. Focus Mode Highlighting
  *    a. Does not highlight some elements (some text boxes, upload pre button)
- *    b. Highlight is cut off for some elements (analytics-fire-recent-pill, result-header)
+ *    b. Highlight is cut off for some elements (analytics-fire-recent-pill, result-header, presentation-title)
+ *
+ * Todo:
+ *  1. Implement auto-scroll shortcut on player screen
+ *  2. Implement volume control shortcuts on player screen
+ *  3. Implement library filter shortcuts
+ *  4. Implement search text shortcuts
+ *    a. "/" for search
+ *    b. "n" and "N" for navigating to next and prev search terms, respectively
  */
 
 import { useEffect, useState, useRef } from "react";
@@ -57,6 +63,7 @@ export const KEYMAP = {
     REWIND      : { key: [",", "<"],      desc: "Rewind" },
     VIEW_GRADE  : { key: "v",             desc: "View Grading"},
     GRADE_PRES  : { key: "g",             desc: "Grade Presentation"},
+    AUTO_SCROLL : { key: "a",             desc: "Toggle Auto-Scroll"},
   },
 } as const;
 
@@ -76,7 +83,7 @@ export default function KeyboardProvider({
   const [showKeybindings, setShowKeybindings] = useState(false);
 
   /* =========================================================
-    HELPERS
+      HELPERS
   ========================================================= */
  /*
   * Expose Focus Mode Globally
@@ -92,7 +99,23 @@ export default function KeyboardProvider({
     const modal = getActiveModal();
     const root: ParentNode = modal ?? document;
 
-    let all = Array.from(
+    // Excluded HTML Elements
+    const excludedSelectors= [
+      ".site-header",
+      ".modal-header",
+      ".modal-close-icon",
+      ".player-header-bar",
+      ".player-panel",
+      ".transcript-controls"
+    ];
+
+    // Pre-fetch all excluded containers
+    const excludedContainers = excludedSelectors.flatMap(selector =>
+      Array.from(document.querySelectorAll(selector))
+    );
+
+    return Array.from(
+      // Included HTML Elements
       root.querySelectorAll<HTMLElement>(`
         button, 
         a, 
@@ -109,27 +132,10 @@ export default function KeyboardProvider({
         .class-dash-card,
         .presentation-row
       `)
-    ).filter(el => !el.hasAttribute("disabled"));
-
-    // Ignore elemnts in page header
-    const header = document.querySelector("header");
-    if (header) {
-      all = all.filter(el => !header.contains(el));
-    }
-
-    // Ignore elements in player header
-    const playerHeader = document.querySelector(".player-header-bar");
-    if (playerHeader) {
-      all = all.filter(el => !playerHeader.contains(el));
-    }
-
-    // Ignore elements in modal header
-    const modalHeader = document.querySelector(".modal-header");
-    if (modalHeader) {
-      all = all.filter(el => !modalHeader.contains(el));
-    }
-
-    return all;
+    ).filter(el => 
+      !el.hasAttribute("disabled") &&
+      !excludedContainers.some(container => container.contains(el))
+    );
   };
 
   /* 
