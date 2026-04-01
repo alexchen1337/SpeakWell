@@ -2,16 +2,16 @@
 
 /*
  * Issues:
- *  1. isElementVisible does not account for modal header
+ *  1. isElementVisible does not account for modal headers or transcript
+ *     control container
  *  2. Focus Mode Highlighting
  *    a. Does not highlight some elements (some text boxes, upload pre button)
  *    b. Highlight is cut off for some elements (analytics-fire-recent-pill, result-header, presentation-title)
  *
  * Todo:
- *  1. Implement auto-scroll shortcut on player screen
- *  2. Implement volume control shortcuts on player screen
- *  3. Implement library filter shortcuts
- *  4. Implement search text shortcuts
+ *  1. Implement volume control shortcuts on player screen
+ *  2. Implement library filter shortcuts
+ *  3. Implement search text shortcuts
  *    a. "/" for search
  *    b. "n" and "N" for navigating to next and prev search terms, respectively
  */
@@ -599,6 +599,13 @@ export default function KeyboardProvider({
           case KEYMAP.AUDIO_PLAYER.GRADE_PRES.key: {
             e.preventDefault();
             const btn = getPlayerActionButton("Grade Presentation");
+            btn?.click();
+            break;
+          }
+
+          case KEYMAP.AUDIO_PLAYER.AUTO_SCROLL.key: {
+            e.preventDefault();
+            const btn = document.querySelector<HTMLButtonElement>(".auto-scroll-toggle")
             btn?.click();
             break;
           }
