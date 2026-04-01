@@ -10,8 +10,6 @@
  *  3. Implement search text shortcuts
  *    a. "/" for search
  *    b. "n" and "N" for navigating to next and prev search terms, respectively
- *  4. Implement go back shortcut
- *  5. Exit foucs mode on mouse click
  */
 
 "use client";
@@ -28,6 +26,7 @@ export const KEYMAP = {
   GLOBAL_BINDINGS: {
     SHOW_BINDS  : { key: "H",             desc: "Toggle List of Bindings"},
     SIGN_OUT    : { key: "Q",             desc: "Sign Out" },
+    GO_BACK     : { key: "B",             desc: "Back to Previous Page"},
     ESCAPE      : { key: "Escape",        desc: "Cancel" },
     ROUTES: {
       D         : { key: "D",             desc: "Dashboard",  route: "/dashboard"},
@@ -513,14 +512,26 @@ export default function KeyboardProvider({ children }: { children: React.ReactNo
           return;
         }
 
+        // Go back
+        if (e.key.toUpperCase() === KEYMAP.GLOBAL_BINDINGS.GO_BACK.key) {
+          e.preventDefault();
+
+          if (isFocusMode) exitFocusMode();
+
+          router.back();
+          return;
+        }
+
         // Sign out
         if (e.key.toUpperCase() === KEYMAP.GLOBAL_BINDINGS.SIGN_OUT.key) {
           e.preventDefault();
+
           const signOutButton = Array.from(
             document.querySelectorAll<HTMLButtonElement>(".auth-button")
           ).find(btn => btn.textContent?.trim().includes("Sign out"));
           signOutButton?.click();
-          setIsFocusMode(false);
+
+          exitFocusMode();
           return;
         }
 
@@ -794,10 +805,6 @@ export default function KeyboardProvider({ children }: { children: React.ReactNo
 
                   {modeKey === "GLOBAL_BINDINGS" ? (
                     <>
-                      <ShortcutRow
-                        desc={modeObj.SIGN_OUT.desc}
-                        keys={[modeObj.SIGN_OUT.key]}
-                      />
                       {Object.entries(modeObj.ROUTES).map(([k, v]) => (
                         <ShortcutRow
                           key={k}
@@ -805,6 +812,14 @@ export default function KeyboardProvider({ children }: { children: React.ReactNo
                           keys={[v.key]}
                         />
                       ))}
+                      <ShortcutRow
+                        desc={modeObj.GO_BACK.desc}
+                        keys={[modeObj.GO_BACK.key]}
+                      />
+                      <ShortcutRow
+                        desc={modeObj.SIGN_OUT.desc}
+                        keys={[modeObj.SIGN_OUT.key]}
+                      />
                     </>
                   ) : (
                     Object.entries(modeObj).map(([k, v]) => {
