@@ -740,7 +740,8 @@ export default function KeyboardProvider({ children }: { children: React.ReactNo
 
           case KEYMAP.AUDIO_PLAYER.GRADE_PRES.key: {
             e.preventDefault();
-            const btn = getPlayerActionButton("Grade Presentation");
+            let btn = getPlayerActionButton("Grade Presentation");
+            if (!btn) btn = getPlayerActionButton("Practice Grade");
             btn?.click();
             break;
           }
