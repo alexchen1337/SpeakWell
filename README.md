@@ -1,9 +1,6 @@
 ## Demo
 
-https://github.com/user-attachments/assets/610f7605-4e81-47e9-8f4f-37a61804787d
-
-- [HD Video](https://youtu.be/EQ4D3hS9acc)
-- [Documentation](https://www.notion.so/SpeakWell-Developer-Docs-30de09fb8c6f81cea630dfbe1fd9e4fa?source=copy_link)
+- [HD Video](https://www.youtube.com/watch?v=W1GTeLeu4Ts)
 
 ## What This Project Does
 
