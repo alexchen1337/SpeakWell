@@ -6,8 +6,7 @@
  *
  * Todo:
  *  1. Implement volume control shortcuts on player screen
- *  2. Implement library filter shortcuts
- *  3. Implement search text shortcuts
+ *  2. Implement search text shortcuts
  *    a. "/" for search
  *    b. "n" and "N" for navigating to next and prev search terms, respectively
  */
@@ -42,18 +41,27 @@ export const KEYMAP = {
     ENTER_FOCUS : { key: "f",             desc: "Enter Focus Mode" },
     SCROLL_DOWN : { key: "j",             desc: "Scroll Down" },
     SCROLL_UP   : { key: "k",             desc: "Scroll Up" },
-    SCROLL_TOP  : { key: "t",             desc: "Scroll to Top of Screen" },
-    SCROLL_MID  : { key: "m",             desc: "Scroll to Middle of Screen" },
-    SCROLL_BOT  : { key: "b",             desc: "Scroll to Bottom of Screen" },
+    SCROLL_TOP  : { key: "t",             desc: "Top of Screen" },
+    SCROLL_MID  : { key: "m",             desc: "Middle of Screen" },
+    SCROLL_BOT  : { key: "b",             desc: "Bottom of Screen" },
   },
+
   FOCUS_MODE: {
     EXIT_FOCUS  : { key: ["f", "Escape"], desc: "Exit Focus Mode" },
     NEXT        : { key: "j",             desc: "Next Element" },
     PREV        : { key: "k",             desc: "Previous Element" },
-    TOP         : { key: "t",             desc: "Go to Top Visible Element" },
-    MIDDLE      : { key: "m",             desc: "Go to Middle Visble Element" },
-    BOTTOM      : { key: "b",             desc: "Go to Bottom Visible Element" },
+    TOP         : { key: "t",             desc: "Top Visible Element" },
+    MIDDLE      : { key: "m",             desc: "Middle Visble Element" },
+    BOTTOM      : { key: "b",             desc: "Bottom Visible Element" },
     SELECT      : { key: "Enter",         desc: "Select Element" },
+  },
+
+  LIBRARY: {
+    NEWEST      : { key: "n",             desc: "Newest First"},
+    OLDEST      : { key: "o",             desc: "Oldest First"},
+    ALPHA       : { key: "a",             desc: "Alphabetical Order"},
+    SMALLEST    : { key: "s",             desc: "Smallest First"},
+    LARGEST     : { key: "l",             desc: "Largest First"},
   },
 
   AUDIO_PLAYER: {
@@ -163,7 +171,6 @@ export default function KeyboardProvider({ children }: { children: React.ReactNo
         textarea, 
         .library-b-search,
         .library-b-drop,
-        .library-b-sort,
         .grading-card.completed, 
         .transcript-word-new,
         .rubric-card,
@@ -645,6 +652,46 @@ export default function KeyboardProvider({ children }: { children: React.ReactNo
         e.preventDefault();
         enterFocusMode();
         return;
+      }
+
+      /* =========================================================
+          LIBRARY SCREEN SHORTCUTS
+      ========================================================= */
+      if (!isTyping && !isFocusMode && pathname.startsWith("/library")) {
+        const sortSelect = document.querySelector<HTMLSelectElement>(".library-b-sort");
+        if (sortSelect) {
+          switch (e.key) {
+            case KEYMAP.LIBRARY.NEWEST.key:
+              e.preventDefault();
+              sortSelect.value = "newest";
+              sortSelect.dispatchEvent(new Event("change", { bubbles: true }));
+              break;
+
+            case KEYMAP.LIBRARY.OLDEST.key:
+              e.preventDefault();
+              sortSelect.value = "oldest";
+              sortSelect.dispatchEvent(new Event("change", { bubbles: true }));
+              break;
+
+            case KEYMAP.LIBRARY.ALPHA.key:
+              e.preventDefault();
+              sortSelect.value = "alphabetical";
+              sortSelect.dispatchEvent(new Event("change", { bubbles: true }));
+              break;
+
+            case KEYMAP.LIBRARY.SMALLEST.key:
+              e.preventDefault();
+              sortSelect.value = "smallest";
+              sortSelect.dispatchEvent(new Event("change", { bubbles: true }));
+              break;
+
+            case KEYMAP.LIBRARY.LARGEST.key:
+              e.preventDefault();
+              sortSelect.value = "largest";
+              sortSelect.dispatchEvent(new Event("change", { bubbles: true }));
+              break;
+          }
+        }
       }
 
       /* =========================================================
