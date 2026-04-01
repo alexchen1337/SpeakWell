@@ -1,7 +1,7 @@
 /*
  * Issues:
  *  1. Focus Mode Highlighting
- *    a. Does not highlight some elements (some text boxes, upload pres button)
+ *    a. Does not highlight some elements (auth-input textboxes)
  *    b. Highlight is cut off for some elements (analytics-fire-recent-pill, result-header, presentation-title)
  *
  * Todo:
@@ -142,9 +142,12 @@ export default function KeyboardProvider({ children }: { children: React.ReactNo
       ".modal-close-icon",
       ".player-header-bar",
       ".player-panel",
-      ".transcript-controls"
+      ".transcript-controls",
+      ".library-b-file-input",
+      "input[accept]",
+      "input[type='search']"
     ];
-
+    
     // Pre-fetch all excluded containers
     const excludedContainers = excludedSelectors.flatMap(selector =>
       Array.from(document.querySelectorAll(selector))
@@ -158,8 +161,10 @@ export default function KeyboardProvider({ children }: { children: React.ReactNo
         [role='button'], 
         input:not([type='hidden']), 
         textarea, 
+        .library-b-search,
+        .library-b-drop,
+        .library-b-sort,
         .grading-card.completed, 
-        .library-upload-dropzone,
         .transcript-word-new,
         .rubric-card,
         .result-header,
