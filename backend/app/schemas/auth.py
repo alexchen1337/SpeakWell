@@ -73,3 +73,5 @@ class UpdateRoleRequest(BaseModel):
         if v not in ("student", "instructor"):
             raise ValueError("Role must be either 'student' or 'instructor'")
         return v
+
+##
