@@ -67,19 +67,6 @@ export default function GradingResultsModal({
     }
   }, [confirm, currentGrading, isDeleting, onDelete]);
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') onClose();
-  }, [onClose]);
-
-  useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = '';
-    };
-  }, [handleKeyDown]);
-
   // Early return for no grading
   if (!currentGrading) {
     return null;

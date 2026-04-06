@@ -1,0 +1,116 @@
+.focus-highlight {
+  position: relative;
+  z-index: 1002;
+  outline: 3px solid var(--color-text-primary);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+/* =========================================
+   Compact Hint Bar
+========================================= */
+.keyboard-hint-bar {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 100%;
+  background: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-border-subtle);
+  padding: 3px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--color-text-primary);
+  z-index: 2000;
+}
+.mode-label {
+  font-weight: 600;
+}
+.hint-separator {
+  opacity: 0.4;
+}
+.hint-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hint-text {
+  opacity: 0.7;
+}
+/* =========================================
+   Shortcuts Panel
+========================================= */
+.shortcuts-overlay {
+  position: fixed;
+  bottom: 35px;
+  left: 0;
+  width: 100%;
+  background: var(--color-bg-primary);
+  border-top: 1px solid var(--color-border-default);
+  padding: 32px 48px;
+  z-index: 9999;
+}
+.shortcuts-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.shortcuts-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-bottom: 24px;
+}
+/* =========================================
+   Grid Layout
+========================================= */
+.shortcuts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 48px;
+}
+.shortcut-section {
+  display: flex;
+  flex-direction: column;
+}
+.section-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--color-text-primary);
+}
+.section-divider {
+  height: 1px;
+  background: var(--color-border-subtle);
+  margin-bottom: 12px;
+}
+/* =========================================
+   Rows
+========================================= */
+.shortcut-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+}
+.shortcut-desc {
+  opacity: 0.85;
+}
+.shortcut-keys {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.shortcut-slash {
+  margin: 4px;
+  opacity: 0.6;
+}
+/* =========================================
+   Key Styling
+========================================= */
+kbd {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  color: var(--color-text-primary);
+}

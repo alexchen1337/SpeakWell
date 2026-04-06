@@ -90,6 +90,8 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({ audio, on
         hideScrollbar: true,
       });
 
+      (window as any).wavesurferInstance = ws;
+
       wavesurferRef.current = ws;
       setWaveformReady(true);
 

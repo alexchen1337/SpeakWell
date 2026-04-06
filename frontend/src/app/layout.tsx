@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ConfirmProvider } from "@/contexts/ConfirmContext";
 import Header from "@/components/Header";
+import KeyboardProvider from "@/components/KeyboardProvider"
 import { AppToaster } from "@/components/AppToaster";
 import "../styles/tokens.css";
 import "./globals.css";
@@ -34,7 +35,9 @@ export default function RootLayout({
         <AuthProvider>
           <ConfirmProvider>
             <Header />
-            {children}
+            <KeyboardProvider>
+              {children}
+            </KeyboardProvider>
             <AppToaster />
           </ConfirmProvider>
         </AuthProvider>
