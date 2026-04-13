@@ -780,16 +780,21 @@ export default function KeyboardProvider({ children }: { children: React.ReactNo
 
           case KEYMAP.NORMAL_MODE.SCROLL_MID.key:
             e.preventDefault();
-            if (scrollContainer instanceof Window) {
-                window.scrollTo({
-                    top: document.body.scrollHeight / 2,
-                    behavior: "smooth",
-                });
+            if (scrollContainer === window) {
+              const scrollHeight = document.documentElement.scrollHeight;
+              const clientHeight = window.innerHeight;
+
+              window.scrollTo({
+                top: (scrollHeight - clientHeight) / 2,
+                behavior: "smooth",
+              });
             } else {
-                scrollContainer.scrollTo({
-                    top: (scrollContainer as HTMLElement).scrollHeight / 2,
-                    behavior: "smooth",
-                });
+              const el = scrollContainer as HTMLElement;
+
+              el.scrollTo({
+                top: (el.scrollHeight - el.clientHeight) / 2,
+                behavior: "smooth",
+              });
             }
             break;
 
