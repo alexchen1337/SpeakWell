@@ -12,6 +12,7 @@ class AudioFile(Base):
     id = Column(String(36), primary_key=True)
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     object_key = Column(String(1024), nullable=False)
+    media_type = Column(String(16), nullable=True)
     filename = Column(String(255), nullable=False)
     file_size = Column(Integer, nullable=True)
     duration = Column(Integer, nullable=True)

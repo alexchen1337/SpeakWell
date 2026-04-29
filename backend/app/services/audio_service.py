@@ -309,6 +309,7 @@ async def upload_files(
                 id=file_id,
                 user_id=current_user.id,
                 object_key=object_key,
+                media_type=media_type,
                 filename=unique_filename,
                 file_size=file_size,
                 duration=duration,

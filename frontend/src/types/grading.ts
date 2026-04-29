@@ -35,12 +35,25 @@ export interface PacingSegment {
   wpm: number;
 }
 
+export interface FrameObservation {
+  timestamp: number;
+  observation: string;
+}
+
+export interface VisualAnalysis {
+  visual_score: number;
+  visual_type: 'slides' | 'presenter' | 'mixed';
+  summary: string;
+  frame_observations: FrameObservation[];
+}
+
 export interface GradingDetailedResults {
   criterion_scores: CriterionScore[];
   filler_words: FillerWord[];
   nonsensical_words: string[];
   pacing_timeline: PacingSegment[];
   ai_feedback: string;
+  visual?: VisualAnalysis | null;
 }
 
 export type GradingSourceType = 'self' | 'instructor';

@@ -1,13 +1,17 @@
+import base64
 import json
 import os
 import re
-from typing import List
+import subprocess
+import tempfile
+from typing import List, Optional
 from statistics import mean, variance
 
 from openai import OpenAI
 from sqlalchemy.orm import Session
 
-from app.models import Grading, Transcript, Rubric, RubricCriterion, GradingStatus
+from app.core.dependencies import download_file
+from app.models import AudioFile, Grading, Transcript, Rubric, RubricCriterion, GradingStatus
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -290,6 +294,116 @@ IMPORTANT: Use the exact criterion IDs provided above (the UUID strings after "I
         }
 
 
+def _extract_video_frames(video_bytes: bytes, filename: str, num_frames: int = 6) -> list[tuple[float, bytes]]:
+    extension = os.path.splitext(filename)[1].lower() or ".mp4"
+    input_path = None
+    frames: list[tuple[float, bytes]] = []
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=extension) as input_file:
+            input_file.write(video_bytes)
+            input_path = input_file.name
+
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", input_path],
+            capture_output=True, text=True, check=False,
+        )
+        try:
+            duration = float((probe.stdout or "0").strip())
+        except ValueError:
+            duration = 0.0
+        if duration <= 0:
+            return []
+
+        timestamps = [duration * (i + 1) / (num_frames + 1) for i in range(num_frames)]
+        for ts in timestamps:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as frame_file:
+                frame_path = frame_file.name
+            try:
+                result = subprocess.run(
+                    ["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{ts:.2f}",
+                     "-i", input_path, "-frames:v", "1", "-q:v", "3", frame_path],
+                    capture_output=True, text=True, check=False,
+                )
+                if result.returncode == 0 and os.path.exists(frame_path):
+                    with open(frame_path, "rb") as f:
+                        frame_bytes = f.read()
+                    if frame_bytes:
+                        frames.append((ts, frame_bytes))
+            finally:
+                if os.path.exists(frame_path):
+                    os.unlink(frame_path)
+        return frames
+    finally:
+        if input_path and os.path.exists(input_path):
+            os.unlink(input_path)
+
+
+def analyze_video_visuals(audio_file: AudioFile) -> Optional[dict]:
+    if not audio_file or audio_file.media_type != "video":
+        return None
+
+    try:
+        video_bytes = download_file(audio_file.object_key)
+    except Exception as e:
+        print(f"[Visuals] Failed to download video: {e}")
+        return None
+
+    try:
+        frames = _extract_video_frames(video_bytes, audio_file.filename)
+    except Exception as e:
+        print(f"[Visuals] Frame extraction failed: {e}")
+        return None
+
+    if not frames:
+        return None
+
+    content = [{
+        "type": "text",
+        "text": (
+            "You are evaluating the visual quality of a video presentation. "
+            f"Below are {len(frames)} frames sampled evenly through the presentation, with timestamps in seconds. "
+            "Assess slide design (if any), presenter presence, body language, eye contact, and overall visual professionalism. "
+            "Respond in JSON with: "
+            "visual_score (0-100 integer), "
+            "visual_type (one of: slides, presenter, mixed), "
+            "summary (one paragraph, 3-4 sentences), "
+            "frame_observations (array of {timestamp: number, observation: string} — one short note per frame)."
+        ),
+    }]
+    for ts, frame_bytes in frames:
+        b64 = base64.b64encode(frame_bytes).decode("ascii")
+        content.append({"type": "text", "text": f"Frame at {ts:.1f}s:"})
+        content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
+        })
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are an expert presentation coach evaluating visual delivery from video frames."},
+                {"role": "user", "content": content},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.4,
+        )
+        result = json.loads(response.choices[0].message.content)
+        visual_type = result.get("visual_type", "mixed")
+        if visual_type not in {"slides", "presenter", "mixed"}:
+            visual_type = "mixed"
+        return {
+            "visual_score": int(max(0, min(100, result.get("visual_score", 0)))),
+            "visual_type": visual_type,
+            "summary": result.get("summary", ""),
+            "frame_observations": result.get("frame_observations", []),
+        }
+    except Exception as e:
+        print(f"[Visuals] Vision call failed: {e}")
+        return None
+
+
 def grade_presentation(grading_id: str, db: Session):
     try:
         grading = db.query(Grading).filter(Grading.id == grading_id).first()
@@ -356,13 +470,22 @@ def grade_presentation(grading_id: str, db: Session):
         grading.overall_score = round(overall_score, 1)
         grading.max_possible_score = max_possible_score
 
-        grading.detailed_results = {
+        detailed_results = {
             "criterion_scores": content_results["criterion_scores"],
             "filler_words": clarity_results["filler_words_breakdown"],
             "nonsensical_words": clarity_results["nonsensical_words"],
             "pacing_timeline": pacing_results["pacing_timeline"],
             "ai_feedback": content_results["overall_feedback"],
         }
+
+        audio_file = db.query(AudioFile).filter(AudioFile.id == transcript.audio_file_id).first()
+        if audio_file and audio_file.media_type == "video":
+            print(f"[Grading] Running visual analysis for video {audio_file.id}")
+            visual = analyze_video_visuals(audio_file)
+            if visual:
+                detailed_results["visual"] = visual
+
+        grading.detailed_results = detailed_results
 
         grading.status = GradingStatus.completed
         db.commit()
