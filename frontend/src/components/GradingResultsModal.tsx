@@ -12,7 +12,13 @@ interface GradingResultsModalProps {
   currentUserId?: string;
 }
 
-type ViewTab = 'overview' | 'content' | 'delivery';
+type ViewTab = 'overview' | 'content' | 'delivery' | 'visuals';
+
+function formatTimestamp(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
 
 export default function GradingResultsModal({
   gradings,
@@ -291,6 +297,14 @@ export default function GradingResultsModal({
                     Delivery
                   </button>
                 )}
+                {currentGrading.detailedResults?.visual && (
+                  <button
+                    className={`view-tab ${activeView === 'visuals' ? 'active' : ''}`}
+                    onClick={() => setActiveView('visuals')}
+                  >
+                    Visuals
+                  </button>
+                )}
               </nav>
 
               {/* Tab Content */}
@@ -471,6 +485,43 @@ export default function GradingResultsModal({
                             </div>
                           </div>
                         )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeView === 'visuals' && currentGrading.detailedResults?.visual && (
+                  <div className="visuals-panel">
+                    <div className="delivery-section">
+                      <div className="visual-score-display">
+                        <div className="visual-score-num">
+                          {currentGrading.detailedResults.visual.visual_score}
+                        </div>
+                        <div className="visual-score-meta">
+                          <span className="visual-score-label">Visual Score</span>
+                          <span className={`visual-type-badge type-${currentGrading.detailedResults.visual.visual_type}`}>
+                            {currentGrading.detailedResults.visual.visual_type}
+                          </span>
+                        </div>
+                      </div>
+                      {currentGrading.detailedResults.visual.summary && (
+                        <p className="visual-summary">
+                          {currentGrading.detailedResults.visual.summary}
+                        </p>
+                      )}
+                    </div>
+
+                    {currentGrading.detailedResults.visual.frame_observations.length > 0 && (
+                      <div className="delivery-section">
+                        <h3>Frame Observations</h3>
+                        <ul className="frame-observations">
+                          {currentGrading.detailedResults.visual.frame_observations.map((obs, idx) => (
+                            <li key={idx} className="frame-observation">
+                              <span className="frame-timestamp">{formatTimestamp(obs.timestamp)}</span>
+                              <span className="frame-text">{obs.observation}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     )}
                   </div>
