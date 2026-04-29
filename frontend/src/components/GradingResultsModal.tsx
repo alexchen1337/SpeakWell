@@ -504,6 +504,27 @@ export default function GradingResultsModal({
                           </span>
                         </div>
                       </div>
+                      {currentGrading.detailedResults.visual.sub_scores && (
+                        <div className="visual-sub-scores">
+                          {(['slide_quality', 'presenter_presence', 'body_language', 'composition'] as const).map((key) => {
+                            const val = currentGrading.detailedResults!.visual!.sub_scores![key];
+                            const label = {
+                              slide_quality: 'Slides',
+                              presenter_presence: 'Presence',
+                              body_language: 'Body Language',
+                              composition: 'Composition',
+                            }[key];
+                            return (
+                              <div key={key} className="visual-sub-score">
+                                <span className="visual-sub-label">{label}</span>
+                                <span className="visual-sub-value">
+                                  {val == null ? 'N/A' : val}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                       {currentGrading.detailedResults.visual.summary && (
                         <p className="visual-summary">
                           {currentGrading.detailedResults.visual.summary}

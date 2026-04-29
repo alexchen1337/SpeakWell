@@ -358,19 +358,43 @@ def analyze_video_visuals(audio_file: AudioFile) -> Optional[dict]:
     if not frames:
         return None
 
-    content = [{
-        "type": "text",
-        "text": (
-            "You are evaluating the visual quality of a video presentation. "
-            f"Below are {len(frames)} frames sampled evenly through the presentation, with timestamps in seconds. "
-            "Assess slide design (if any), presenter presence, body language, eye contact, and overall visual professionalism. "
-            "Respond in JSON with: "
-            "visual_score (0-100 integer), "
-            "visual_type (one of: slides, presenter, mixed), "
-            "summary (one paragraph, 3-4 sentences), "
-            "frame_observations (array of {timestamp: number, observation: string} — one short note per frame)."
-        ),
-    }]
+    rubric = (
+        f"You are evaluating the visual quality of a video presentation from {len(frames)} frames "
+        "sampled evenly across the presentation (timestamps in seconds shown above each frame).\n\n"
+        "Score these four sub-dimensions on a 0-100 scale. If a dimension is not applicable to this "
+        "video (e.g. no slides ever shown), return null for it.\n"
+        "  - slide_quality: clarity, readability, design, information density of any slides shown. "
+        "null if no slides appear in any frame.\n"
+        "  - presenter_presence: composure, eye contact with camera/audience, on-camera framing, confidence.\n"
+        "  - body_language: gestures, posture, movement, energy, openness.\n"
+        "  - composition: lighting, framing, background, visual noise, production quality.\n\n"
+        "Use this calibration — be willing to go LOW when warranted:\n"
+        "  0-30   poor / distracting / amateur\n"
+        "  31-55  weak — multiple visible issues\n"
+        "  56-72  average — competent but unremarkable\n"
+        "  73-85  good — clearly above average\n"
+        "  86-95  excellent — TED-quality professional\n"
+        "  96-100 exceptional — reserved for elite, virtuoso work\n\n"
+        "IMPORTANT: Most presentations land in 56-85. Reserve 86+ ONLY for visibly exceptional work. "
+        "Do NOT default to ~80 when you have specific observations — differentiate. If two frames look "
+        "different in quality, the scores should differ. Avoid clustering at any single value.\n\n"
+        "Then compute visual_score = round(mean of the non-null sub_scores).\n\n"
+        "Respond in JSON with this exact shape:\n"
+        "{\n"
+        '  "visual_type": "slides" | "presenter" | "mixed",\n'
+        '  "sub_scores": {\n'
+        '    "slide_quality": <int 0-100 or null>,\n'
+        '    "presenter_presence": <int 0-100>,\n'
+        '    "body_language": <int 0-100>,\n'
+        '    "composition": <int 0-100>\n'
+        "  },\n"
+        '  "visual_score": <int 0-100>,\n'
+        '  "summary": "<3-4 sentences explaining the score, citing specific observations>",\n'
+        '  "frame_observations": [{"timestamp": <number>, "observation": "<short specific note>"}]\n'
+        "}"
+    )
+
+    content: list[dict] = []
     for ts, frame_bytes in frames:
         b64 = base64.b64encode(frame_bytes).decode("ascii")
         content.append({"type": "text", "text": f"Frame at {ts:.1f}s:"})
@@ -378,24 +402,53 @@ def analyze_video_visuals(audio_file: AudioFile) -> Optional[dict]:
             "type": "image_url",
             "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
         })
+    content.append({"type": "text", "text": rubric})
 
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are an expert presentation coach evaluating visual delivery from video frames."},
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a demanding presentation coach. You evaluate visual delivery from video "
+                        "frames using a strict calibrated rubric. You differentiate between presentations "
+                        "and avoid defaulting to safe middle scores."
+                    ),
+                },
                 {"role": "user", "content": content},
             ],
             response_format={"type": "json_object"},
-            temperature=0.4,
+            temperature=0.7,
         )
         result = json.loads(response.choices[0].message.content)
+
         visual_type = result.get("visual_type", "mixed")
         if visual_type not in {"slides", "presenter", "mixed"}:
             visual_type = "mixed"
+
+        raw_subs = result.get("sub_scores") or {}
+        sub_scores: dict[str, Optional[int]] = {}
+        for key in ("slide_quality", "presenter_presence", "body_language", "composition"):
+            val = raw_subs.get(key)
+            if val is None:
+                sub_scores[key] = None
+            else:
+                try:
+                    sub_scores[key] = int(max(0, min(100, int(val))))
+                except (TypeError, ValueError):
+                    sub_scores[key] = None
+
+        present = [v for v in sub_scores.values() if v is not None]
+        if present:
+            visual_score = round(sum(present) / len(present))
+        else:
+            visual_score = int(max(0, min(100, result.get("visual_score", 0))))
+
         return {
-            "visual_score": int(max(0, min(100, result.get("visual_score", 0)))),
+            "visual_score": visual_score,
             "visual_type": visual_type,
+            "sub_scores": sub_scores,
             "summary": result.get("summary", ""),
             "frame_observations": result.get("frame_observations", []),
         }

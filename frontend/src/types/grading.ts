@@ -40,9 +40,17 @@ export interface FrameObservation {
   observation: string;
 }
 
+export interface VisualSubScores {
+  slide_quality: number | null;
+  presenter_presence: number | null;
+  body_language: number | null;
+  composition: number | null;
+}
+
 export interface VisualAnalysis {
   visual_score: number;
   visual_type: 'slides' | 'presenter' | 'mixed';
+  sub_scores?: VisualSubScores;
   summary: string;
   frame_observations: FrameObservation[];
 }
